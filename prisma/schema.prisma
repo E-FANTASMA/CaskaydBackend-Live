@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SubscriptionPlan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  FAILED
+  CANCELLED
+}
+
+enum PlatformType {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  X
+  LINKEDIN
+}
+
+enum CampaignCreatorStatus {
+  NOT_CONTACTED
+  CONTACTED
+  RESPONDED
+  ACCEPTED
+  DECLINED
+  AWAITING_CONTENT
+  CONTENT_DELIVERED
+}
+
+model User {
+  id               String          @id @default(cuid())
+  email            String          @unique
+  password         String
+  fullName         String
+  refreshTokenHash String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  subscriptions    Subscription[]
+  campaigns        Campaign[]
+  savedCreators    SavedCreator[]
+}
+
+model Subscription {
+  id                        String             @id @default(cuid())
+  userId                    String
+  plan                      SubscriptionPlan
+  status                    SubscriptionStatus @default(PENDING)
+  flutterwaveTransactionId  String?            @unique
+  flutterwaveReference      String?            @unique
+  expiresAt                 DateTime?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  user                      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Creator {
+  id               String            @id @default(cuid())
+  name             String
+  gender           String?
+  country          String?
+  state            String?
+  primaryNiche     String
+  secondaryNiches  String[]
+  businessEmail    String?
+  profileImage     String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  platforms        CreatorPlatform[]
+  searchTags       SearchTag[]
+  campaignCreators CampaignCreator[]
+  savedCreators    SavedCreator[]
+}
+
+model CreatorPlatform {
+  id          String       @id @default(cuid())
+  creatorId   String
+  platform    PlatformType
+  handle      String
+  followers   Int
+  verified    Boolean      @default(false)
+  profileUrl  String?
+  lastUpdated DateTime     @default(now())
+  creator     Creator      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId, platform])
+}
+
+model SearchTag {
+  id        String   @id @default(cuid())
+  creatorId String
+  tag       String
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId])
+  @@index([tag])
+}
+
+model Campaign {
+  id               String               @id @default(cuid())
+  userId           String
+  name             String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignCreators CampaignCreator[]
+}
+
+model CampaignCreator {
+  campaignId String
+  creatorId  String
+  status     CampaignCreatorStatus @default(NOT_CONTACTED)
+  addedAt    DateTime              @default(now())
+  campaign   Campaign              @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator    Creator               @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  notes      CampaignCreatorNote[]
+
+  @@id([campaignId, creatorId])
+  @@index([creatorId])
+}
+
+model CampaignCreatorNote {
+  id         String          @id @default(cuid())
+  campaignId String
+  creatorId  String
+  note       String
+  createdAt  DateTime        @default(now())
+  campaignCreator CampaignCreator @relation(fields: [campaignId, creatorId], references: [campaignId, creatorId], onDelete: Cascade)
+
+  @@index([campaignId, creatorId])
+}
+
+model SavedCreator {
+  id        String   @id @default(cuid())
+  userId    String
+  creatorId String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, creatorId])
+  @@index([userId])
+}
