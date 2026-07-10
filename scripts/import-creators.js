@@ -149,6 +149,14 @@ function normalizeText(value) {
   return trimmed || undefined;
 }
 
+function slugify(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function normalizeCountry(value) {
   const normalized = normalizeText(value);
   if (!normalized) {
@@ -451,6 +459,18 @@ async function main() {
 
   try {
     await prisma.$connect();
+    const categories = await prisma.category.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+    });
+    const categoryIndex = new Map();
+    for (const category of categories) {
+      categoryIndex.set(category.slug, category);
+      categoryIndex.set(category.name.toLowerCase(), category);
+    }
     const existingCreators = await prisma.creator.findMany({
       select: {
         id: true,
@@ -465,6 +485,14 @@ async function main() {
       },
     });
     const existingIndex = buildExistingIdentityIndex(existingCreators);
+
+    const resolveCategory = (value) => {
+      const normalized = normalizeText(value);
+      if (!normalized) {
+        return undefined;
+      }
+      return categoryIndex.get(slugify(normalized)) ?? categoryIndex.get(normalized.toLowerCase());
+    };
 
     for (const row of rows) {
       const result = buildCreatorPayload(row, args.mode);
@@ -507,10 +535,35 @@ async function main() {
         continue;
       }
 
+      const primaryCategory = resolveCategory(result.payload.primaryNiche);
+      if (!primaryCategory) {
+        summary.skipped += 1;
+        if (skippedSamples.length < 10) {
+          skippedSamples.push({
+            handle:
+              cleanHandle(row['Instagram Handle']) ??
+              cleanHandle(row['TikTok Handle']) ??
+              cleanHandle(row['YouTube Handle']) ??
+              cleanHandle(row['X (Twitter) Handle']) ??
+              '(no handle)',
+            reason: `missing_category:${result.payload.primaryNiche}`,
+          });
+        }
+        continue;
+      }
+
+      const secondaryCategoryIds = [...new Set(
+        result.payload.secondaryNiches
+          .map((niche) => resolveCategory(niche))
+          .filter(Boolean)
+          .map((category) => category.id)
+          .filter((categoryId) => categoryId !== primaryCategory.id),
+      )].slice(0, 5);
+
       if (readySamples.length < 5) {
         readySamples.push({
           name: result.payload.name,
-          primaryNiche: result.payload.primaryNiche,
+          primaryCategory: primaryCategory.name,
           platforms: result.payload.platforms.map((platform) => `${platform.platform}:${platform.handle}`),
         });
       }
@@ -543,10 +596,16 @@ async function main() {
           gender: result.payload.gender,
           country: result.payload.country,
           state: result.payload.state,
-          primaryNiche: result.payload.primaryNiche,
-          secondaryNiches: result.payload.secondaryNiches,
+          primaryCategoryId: primaryCategory.id,
           businessEmail: result.payload.businessEmail,
           profileImage: result.payload.profileImage,
+          secondaryCategories: secondaryCategoryIds.length
+            ? {
+                create: secondaryCategoryIds.map((categoryId) => ({
+                  categoryId,
+                })),
+              }
+            : undefined,
           platforms: result.payload.platforms.length
             ? {
                 create: result.payload.platforms,

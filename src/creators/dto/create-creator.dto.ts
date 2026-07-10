@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsEmail,
   IsOptional,
@@ -30,14 +32,41 @@ export class CreateCreatorDto {
   @IsString()
   state?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Normalized primary category id. Preferred over legacy primaryNiche.',
+  })
+  @IsOptional()
   @IsString()
-  primaryNiche: string;
+  primaryCategoryId?: string;
 
-  @ApiProperty({ type: [String] })
+  @ApiPropertyOptional({
+    description: 'Legacy field kept for backwards compatibility.',
+  })
+  @IsOptional()
+  @IsString()
+  primaryNiche?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Normalized secondary category ids.',
+  })
+  @IsOptional()
   @IsArray()
+  @ArrayMaxSize(5)
+  @ArrayUnique()
   @IsString({ each: true })
-  secondaryNiches: string[];
+  secondaryCategoryIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Legacy field kept for backwards compatibility.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @ArrayUnique()
+  @IsString({ each: true })
+  secondaryNiches?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -52,6 +81,7 @@ export class CreateCreatorDto {
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @IsArray()
+  @ArrayUnique()
   @IsString({ each: true })
   searchTags?: string[];
 

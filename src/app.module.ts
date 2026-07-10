@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { CampaignIntentsModule } from './campaign-intents/campaign-intents.module';
+import { CategoriesModule } from './categories/categories.module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -34,6 +36,8 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     PaymentsModule,
     SubscriptionsModule,
+    CategoriesModule,
+    CampaignIntentsModule,
     CreatorsModule,
     SearchModule,
     CampaignsModule,

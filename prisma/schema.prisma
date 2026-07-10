@@ -67,21 +67,24 @@ model Subscription {
 }
 
 model Creator {
-  id               String            @id @default(cuid())
-  name             String
-  gender           String?
-  country          String?
-  state            String?
-  primaryNiche     String
-  secondaryNiches  String[]
-  businessEmail    String?
-  profileImage     String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  platforms        CreatorPlatform[]
-  searchTags       SearchTag[]
-  campaignCreators CampaignCreator[]
-  savedCreators    SavedCreator[]
+  id                  String                     @id @default(cuid())
+  name                String
+  gender              String?
+  country             String?
+  state               String?
+  primaryCategoryId   String
+  businessEmail       String?
+  profileImage        String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  primaryCategory     Category                   @relation("CreatorPrimaryCategory", fields: [primaryCategoryId], references: [id])
+  secondaryCategories CreatorSecondaryCategory[]
+  platforms           CreatorPlatform[]
+  searchTags          SearchTag[]
+  campaignCreators    CampaignCreator[]
+  savedCreators       SavedCreator[]
+
+  @@index([primaryCategoryId])
 }
 
 model CreatorPlatform {
@@ -102,9 +105,70 @@ model SearchTag {
   id        String   @id @default(cuid())
   creatorId String
   tag       String
+  createdAt DateTime @default(now())
   creator   Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
   @@index([creatorId])
+  @@index([tag])
+}
+
+model Category {
+  id               String                     @id @default(cuid())
+  name             String
+  slug             String                     @unique
+  description      String?
+  parentId         String?
+  level            Int
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  parent           Category?                  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children         Category[]                 @relation("CategoryTree")
+  creatorPrimary   Creator[]                  @relation("CreatorPrimaryCategory")
+  creatorSecondary CreatorSecondaryCategory[]
+  campaignIntents  CampaignIntentCategory[]
+
+  @@index([parentId])
+  @@index([level])
+}
+
+model CreatorSecondaryCategory {
+  creatorId   String
+  categoryId  String
+  createdAt   DateTime @default(now())
+  creator     Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([creatorId, categoryId])
+  @@index([categoryId])
+}
+
+model CampaignIntent {
+  id          String                   @id @default(cuid())
+  name        String
+  slug        String                   @unique
+  description String?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  categories  CampaignIntentCategory[]
+  tags        CampaignIntentTag[]
+}
+
+model CampaignIntentCategory {
+  campaignIntentId String
+  categoryId       String
+  campaignIntent   CampaignIntent @relation(fields: [campaignIntentId], references: [id], onDelete: Cascade)
+  category         Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([campaignIntentId, categoryId])
+  @@index([categoryId])
+}
+
+model CampaignIntentTag {
+  campaignIntentId String
+  tag              String
+  campaignIntent   CampaignIntent @relation(fields: [campaignIntentId], references: [id], onDelete: Cascade)
+
+  @@id([campaignIntentId, tag])
   @@index([tag])
 }
 
