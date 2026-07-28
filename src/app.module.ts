@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { CommonModule } from './common/common.module';
 import { configValidationSchema } from './config/config.validation';
+import { CrawlerModule } from './crawler/crawler.module';
 import { CreatorsModule } from './creators/creators.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DatabaseModule } from './database/database.module';
@@ -38,6 +39,7 @@ import { UsersModule } from './users/users.module';
     SubscriptionsModule,
     CategoriesModule,
     CampaignIntentsModule,
+    CrawlerModule,
     CreatorsModule,
     SearchModule,
     CampaignsModule,

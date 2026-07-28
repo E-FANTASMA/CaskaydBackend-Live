@@ -15,6 +15,7 @@ export const configValidationSchema = Joi.object({
     .uri()
     .default('https://api.flutterwave.com/v3'),
   FLUTTERWAVE_REDIRECT_URL: Joi.string().uri().allow('').default(''),
+  FLUTTERWAVE_WEBHOOK_SECRET_HASH: Joi.string().allow('').default(''),
   REDIS_HOST: Joi.string().default('127.0.0.1'),
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().allow('').optional(),

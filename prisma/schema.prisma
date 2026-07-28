@@ -7,9 +7,8 @@ datasource db {
 }
 
 enum SubscriptionPlan {
-  STARTER
-  PRO
-  ENTERPRISE
+  INDIVIDUAL
+  TEAM
 }
 
 enum SubscriptionStatus {
@@ -56,14 +55,19 @@ model Subscription {
   userId                    String
   plan                      SubscriptionPlan
   status                    SubscriptionStatus @default(PENDING)
+  autoRenew                 Boolean            @default(false)
   flutterwaveTransactionId  String?            @unique
   flutterwaveReference      String?            @unique
+  flutterwaveSubscriptionId Int?               @unique
+  flutterwavePaymentPlanId  Int?
   expiresAt                 DateTime?
+  cancelledAt               DateTime?
   createdAt                 DateTime           @default(now())
   updatedAt                 DateTime           @updatedAt
   user                      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
+  @@index([flutterwavePaymentPlanId])
 }
 
 model Creator {

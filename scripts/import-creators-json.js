@@ -46,8 +46,8 @@ async function main() {
 
   try {
     const importer = app.get(CrawlerImporterService);
-    const summary = await importer.importCsv(path.resolve(args.file), {
-      source: 'csv',
+    const summary = await importer.importJson(path.resolve(args.file), {
+      source: 'json',
       dryRun: args.dryRun,
     });
 
