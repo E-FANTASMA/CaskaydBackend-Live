@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PlatformType } from '@prisma/client';
 import { JobsOptions } from 'bullmq';
 import {
@@ -10,7 +11,16 @@ import { QueueService } from '../../common/services/queue.service';
 
 @Injectable()
 export class CrawlerQueueService {
-  constructor(private readonly queueService: QueueService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly queueService: QueueService,
+  ) {}
+
+  private assertEnabled() {
+    if (this.configService.get<boolean>('CRAWLER_ENABLED') === false) {
+      throw new ServiceUnavailableException('Crawler is disabled by configuration');
+    }
+  }
 
   async enqueueDiscovery(
     platform: PlatformType,
@@ -18,6 +28,7 @@ export class CrawlerQueueService {
     limit = 25,
     options?: JobsOptions,
   ) {
+    this.assertEnabled();
     return this.queueService.getQueue(CRAWLER_QUEUE_NAME).add(
       CRAWLER_DISCOVERY_JOB,
       {
@@ -34,6 +45,7 @@ export class CrawlerQueueService {
   }
 
   async enqueueRefresh(creatorId: string, platform: PlatformType, options?: JobsOptions) {
+    this.assertEnabled();
     return this.queueService.getQueue(CRAWLER_QUEUE_NAME).add(
       CRAWLER_REFRESH_JOB,
       {

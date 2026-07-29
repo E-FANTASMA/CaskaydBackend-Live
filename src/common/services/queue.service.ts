@@ -1,14 +1,23 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {
   private readonly queues = new Map<string, Queue>();
+  private readonly enabled: boolean;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    this.enabled = Boolean(this.configService.get<string>('REDIS_HOST')?.trim());
+  }
 
   getQueue(name: string) {
+    if (!this.enabled) {
+      throw new ServiceUnavailableException(
+        'Redis-backed queues are disabled because REDIS_HOST is not configured',
+      );
+    }
+
     if (!this.queues.has(name)) {
       this.queues.set(
         name,
@@ -25,6 +34,10 @@ export class QueueService implements OnModuleDestroy {
     }
 
     return this.queues.get(name)!;
+  }
+
+  isEnabled() {
+    return this.enabled;
   }
 
   async onModuleDestroy() {

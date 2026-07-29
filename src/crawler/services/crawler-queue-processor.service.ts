@@ -16,6 +16,8 @@ import { DiscoveryJobPayload, RefreshJobPayload } from '../interfaces/crawler-qu
 export class CrawlerQueueProcessorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CrawlerQueueProcessorService.name);
   private worker?: Worker;
+  private readonly redisEnabled: boolean;
+  private readonly crawlerEnabled: boolean;
 
   constructor(
     private readonly configService: ConfigService,
@@ -23,9 +25,25 @@ export class CrawlerQueueProcessorService implements OnModuleInit, OnModuleDestr
     private readonly discoveryService: CrawlerDiscoveryService,
     private readonly platformRegistry: CrawlerPlatformRegistryService,
     private readonly pipeline: CrawlerPipelineService,
-  ) {}
+  ) {
+    this.crawlerEnabled =
+      this.configService.get<boolean>('CRAWLER_ENABLED') !== false;
+    this.redisEnabled = Boolean(
+      this.configService.get<string>('REDIS_HOST')?.trim(),
+    );
+  }
 
   onModuleInit() {
+    if (!this.crawlerEnabled) {
+      this.logger.log('Crawler queue processor is disabled because CRAWLER_ENABLED is false');
+      return;
+    }
+
+    if (!this.redisEnabled) {
+      this.logger.log('Crawler queue processor is disabled because REDIS_HOST is not configured');
+      return;
+    }
+
     this.worker = new Worker(
       CRAWLER_QUEUE_NAME,
       async (job) => this.processJob(job),
