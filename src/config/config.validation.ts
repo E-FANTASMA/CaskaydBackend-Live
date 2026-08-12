@@ -17,6 +17,11 @@ export const configValidationSchema = Joi.object({
   FLUTTERWAVE_REDIRECT_URL: Joi.string().uri().allow('').default(''),
   FLUTTERWAVE_WEBHOOK_SECRET_HASH: Joi.string().allow('').default(''),
   CRAWLER_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
+  KEEP_ALIVE_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
+  KEEP_ALIVE_URL: Joi.string().uri().allow('').default(''),
   REDIS_HOST: Joi.string().allow('').default(''),
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().allow('').optional(),

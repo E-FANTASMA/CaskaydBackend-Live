@@ -28,7 +28,7 @@ const crawlerWorkers = [
 ];
 
 @Module({
-  imports: [CommonModule, ScheduleModule.forRoot()],
+  imports: [CommonModule, ScheduleModule],
   controllers: [CrawlerController],
   providers: [
     ...crawlerWorkers,

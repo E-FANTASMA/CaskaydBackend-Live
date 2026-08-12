@@ -10,6 +10,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "import:creators": "node scripts/import-creators.js",
     "import:creators:json": "node scripts/import-creators-json.js",
+    "sync:creator-avatars:batch": "node scripts/batch-sync-creator-instagram-avatars.js",
+    "sync:creator-avatars": "py scripts/sync-creator-instagram-avatars.py",
     "postinstall": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts",
     "start": "node dist/src/main.js",

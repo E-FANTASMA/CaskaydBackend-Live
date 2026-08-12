@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CampaignIntentsModule } from './campaign-intents/campaign-intents.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module';
         limit: 30,
       },
     ]),
+    ScheduleModule.forRoot(),
     CommonModule,
     DatabaseModule,
     AuthModule,

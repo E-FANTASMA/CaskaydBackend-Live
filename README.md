@@ -42,6 +42,8 @@ JWT_REFRESH_EXPIRES_IN=7d
 FLUTTERWAVE_SECRET_KEY=
 FLUTTERWAVE_BASE_URL=https://api.flutterwave.com/v3
 FLUTTERWAVE_REDIRECT_URL=
+KEEP_ALIVE_ENABLED=false
+KEEP_ALIVE_URL=
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_PASSWORD=
@@ -53,6 +55,13 @@ Required values:
 - `DATABASE_URL`
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
+
+Optional keep-alive values:
+
+- `KEEP_ALIVE_ENABLED=true` enables a cron that pings your backend every 10 minutes
+- `KEEP_ALIVE_URL=https://your-backend-host/api/health` sets the public health URL to ping
+
+If `KEEP_ALIVE_URL` is empty and your host exposes `RENDER_EXTERNAL_URL`, the app will fall back to `RENDER_EXTERNAL_URL/api/health`.
 
 Then prepare Prisma:
 
@@ -102,6 +111,47 @@ Optional mode:
 ```bash
 npm run import:creators -- --file=path/to/creators.csv --mode=lenient
 ```
+
+## Pull One Instagram Profile Picture
+
+This repo now uses a very simple Instaloader script for testing one profile picture at a time.
+
+Run the default creator:
+
+```bash
+npm run sync:creator-avatars
+```
+
+Run a different creator:
+
+```bash
+npm run sync:creator-avatars -- official_gegeh
+```
+
+The script prints the profile picture URL and downloads the profile image locally.
+
+## Batch Save Instagram Profile URLs
+
+If you want to automate saving profile picture URLs into `Creator.profileImage` for creators who do not already have one, run:
+
+```bash
+npm run sync:creator-avatars:batch
+```
+
+Default batch size is `5`. To run a different size:
+
+```bash
+npm run sync:creator-avatars:batch -- --limit=10
+```
+
+This batch script:
+
+- only selects creators whose `profileImage` is empty
+- uses the first Instagram handle on each creator
+- fetches the profile picture URL
+- stores that URL in the database
+- skips creators that already have a `profileImage`
+
 
 ## Redis
 
