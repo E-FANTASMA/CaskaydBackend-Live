@@ -18,19 +18,21 @@ import { UpdateCreatorDto } from '../dto/update-creator.dto';
 import { CreatorsService } from '../services/creators.service';
 
 @ApiTags('Creators')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, SubscriptionGuard)
 @Controller('creators')
 export class CreatorsController {
   constructor(private readonly creatorsService: CreatorsService) {}
 
   @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, SubscriptionGuard)
   @ApiOperation({ summary: 'List creators' })
   findAll(@Query() query: QueryCreatorsDto) {
     return this.creatorsService.findAll(query);
   }
 
   @Get(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, SubscriptionGuard)
   @ApiOperation({ summary: 'Get a creator by id' })
   findOne(@Param('id') id: string) {
     return this.creatorsService.findOne(id);
@@ -43,12 +45,16 @@ export class CreatorsController {
   }
 
   @Patch(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, SubscriptionGuard)
   @ApiOperation({ summary: 'Update a creator' })
   update(@Param('id') id: string, @Body() dto: UpdateCreatorDto) {
     return this.creatorsService.update(id, dto);
   }
 
   @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, SubscriptionGuard)
   @ApiOperation({ summary: 'Delete a creator' })
   remove(@Param('id') id: string) {
     return this.creatorsService.remove(id);

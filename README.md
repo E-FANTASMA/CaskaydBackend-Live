@@ -80,6 +80,7 @@ npm run start:dev
 
 - API base: `http://localhost:3000/api`
 - Swagger docs: `http://localhost:3000/docs`
+- Transaction guide: `./TRANSACTION_GUIDE.md`
 
 ## Useful Scripts
 
