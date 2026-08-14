@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { SubscriptionsService } from '../../subscriptions/services/subscriptions.service';
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
   async getDashboard(userId: string) {
     const [
@@ -13,10 +17,7 @@ export class DashboardService {
       recentCampaigns,
       recentSavedCreators,
     ] = await Promise.all([
-      this.prisma.subscription.findFirst({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      }),
+      this.subscriptionsService.getCurrentSubscription(userId),
       this.prisma.campaign.count({
         where: { userId },
       }),

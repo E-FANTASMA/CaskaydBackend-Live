@@ -121,4 +121,59 @@ describe('SubscriptionsService', () => {
       NotFoundException,
     );
   });
+
+  it('returns the unexpired subscription even when a newer expired row exists', async () => {
+    const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'expired-newer',
+        status: SubscriptionStatus.EXPIRED,
+        expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+      {
+        id: 'active-older',
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: futureDate,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+
+    const result = await service.getCurrentSubscription('user-1');
+
+    expect(result).toMatchObject({
+      id: 'active-older',
+      status: SubscriptionStatus.ACTIVE,
+      expiresAt: futureDate,
+    });
+  });
+
+  it('restores access when an unexpired subscription was marked expired locally', async () => {
+    const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        status: SubscriptionStatus.EXPIRED,
+        expiresAt: futureDate,
+        createdAt: new Date(),
+      },
+    ] as never);
+    prisma.subscription.update.mockResolvedValue({
+      id: 'sub-1',
+      status: SubscriptionStatus.ACTIVE,
+      expiresAt: futureDate,
+    } as never);
+
+    const result = await service.ensureActiveSubscription('user-1');
+
+    expect(prisma.subscription.update).toHaveBeenCalledWith({
+      where: { id: 'sub-1' },
+      data: { status: SubscriptionStatus.ACTIVE },
+    });
+    expect(result).toMatchObject({
+      id: 'sub-1',
+      status: SubscriptionStatus.ACTIVE,
+      expiresAt: futureDate,
+    });
+  });
 });

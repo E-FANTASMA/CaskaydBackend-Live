@@ -158,10 +158,7 @@ export class SubscriptionsService {
   }
 
   getCurrentSubscription(userId: string) {
-    return this.prisma.subscription.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.getMostRelevantSubscription(userId);
   }
 
   async cancel(userId: string) {
@@ -195,13 +192,7 @@ export class SubscriptionsService {
   }
 
   async ensureActiveSubscription(userId: string) {
-    const subscription = await this.prisma.subscription.findFirst({
-      where: {
-        userId,
-        status: SubscriptionStatus.ACTIVE,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const subscription = await this.getMostRelevantSubscription(userId);
 
     if (!subscription) {
       throw new BadRequestException('An active subscription is required');
@@ -366,6 +357,36 @@ export class SubscriptionsService {
     );
 
     return effectiveBaseDate;
+  }
+
+  private async getMostRelevantSubscription(userId: string) {
+    const subscriptions = await this.prisma.subscription.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }],
+    });
+
+    if (!subscriptions.length) {
+      return null;
+    }
+
+    const now = new Date();
+    const activeSubscription = subscriptions.find(
+      (subscription) =>
+        subscription.expiresAt !== null && subscription.expiresAt > now,
+    );
+
+    if (activeSubscription) {
+      if (activeSubscription.status !== SubscriptionStatus.ACTIVE) {
+        return this.prisma.subscription.update({
+          where: { id: activeSubscription.id },
+          data: { status: SubscriptionStatus.ACTIVE },
+        });
+      }
+
+      return activeSubscription;
+    }
+
+    return subscriptions[0];
   }
 
   private getEventType(payload: Record<string, unknown>) {
