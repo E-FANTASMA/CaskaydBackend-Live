@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import {
   creatorRelationsInclude,
   serializeCreator,
+  withProfilePhoto,
 } from '../../creators/creator-response.util';
 import { CampaignIntentResolverService } from './campaign-intent-resolver.service';
 import { DictionaryParser } from './dictionary-parser.service';
@@ -63,7 +64,10 @@ export class SearchService {
         },
       });
 
-      return this.rankingService.rankLegacy(creators, filters);
+      return this.rankingService.rankLegacy(creators, filters).map((result) => ({
+        ...result,
+        creator: withProfilePhoto(result.creator),
+      }));
     }
   }
 

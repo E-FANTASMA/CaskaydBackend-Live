@@ -83,12 +83,16 @@ describe('SubscriptionsService', () => {
   });
 
   it('cancels auto-renew without removing current access immediately', async () => {
-    prisma.subscription.findFirst.mockResolvedValue({
-      id: 'sub-1',
-      status: SubscriptionStatus.ACTIVE,
-      autoRenew: true,
-      flutterwaveSubscriptionId: 55,
-    } as never);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        status: SubscriptionStatus.ACTIVE,
+        autoRenew: true,
+        flutterwaveSubscriptionId: 55,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+    ] as never);
     prisma.subscription.update.mockResolvedValue({
       id: 'sub-1',
       autoRenew: false,
@@ -115,10 +119,46 @@ describe('SubscriptionsService', () => {
   });
 
   it('throws when cancelling with no active subscription', async () => {
-    prisma.subscription.findFirst.mockResolvedValue(null);
+    prisma.subscription.findMany.mockResolvedValue([] as never);
 
     await expect(service.cancel('user-1')).rejects.toBeInstanceOf(
       NotFoundException,
+    );
+  });
+
+  it('cancels the live subscription even when a newer expired row exists', async () => {
+    const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'expired-newer',
+        status: SubscriptionStatus.EXPIRED,
+        autoRenew: false,
+        flutterwaveSubscriptionId: null,
+        expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+      {
+        id: 'active-older',
+        status: SubscriptionStatus.ACTIVE,
+        autoRenew: true,
+        flutterwaveSubscriptionId: 91,
+        expiresAt: futureDate,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+    prisma.subscription.update.mockResolvedValue({
+      id: 'active-older',
+      autoRenew: false,
+      cancelledAt: new Date(),
+    } as never);
+
+    await service.cancel('user-1');
+
+    expect(paymentsService.cancelSubscription).toHaveBeenCalledWith(91);
+    expect(prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'active-older' },
+      }),
     );
   });
 

@@ -162,15 +162,20 @@ export class SubscriptionsService {
   }
 
   async cancel(userId: string) {
-    const subscription = await this.prisma.subscription.findFirst({
-      where: {
-        userId,
-        status: SubscriptionStatus.ACTIVE,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const subscription = await this.getMostRelevantSubscription(userId);
 
     if (!subscription) {
+      throw new NotFoundException('Active subscription not found');
+    }
+
+    if (!subscription.expiresAt || subscription.expiresAt < new Date()) {
+      if (subscription.status !== SubscriptionStatus.EXPIRED) {
+        await this.prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { status: SubscriptionStatus.EXPIRED },
+        });
+      }
+
       throw new NotFoundException('Active subscription not found');
     }
 

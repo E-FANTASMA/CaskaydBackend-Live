@@ -15,8 +15,17 @@ export type CreatorWithRelations = Prisma.CreatorGetPayload<{
   include: typeof creatorRelationsInclude;
 }>;
 
-export function serializeCreator(creator: CreatorWithRelations) {
+export function withProfilePhoto<T extends { profileImage?: string | null }>(
+  creator: T,
+) {
   return {
+    ...creator,
+    profilePhoto: creator.profileImage ?? null,
+  };
+}
+
+export function serializeCreator(creator: CreatorWithRelations) {
+  return withProfilePhoto({
     ...creator,
     primaryNiche: creator.primaryCategory.name,
     secondaryNiches: creator.secondaryCategories.map(
@@ -25,5 +34,5 @@ export function serializeCreator(creator: CreatorWithRelations) {
     secondaryCategoryIds: creator.secondaryCategories.map(
       ({ categoryId }) => categoryId,
     ),
-  };
+  });
 }
