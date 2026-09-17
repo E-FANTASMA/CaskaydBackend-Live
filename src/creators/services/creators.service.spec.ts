@@ -58,4 +58,20 @@ describe('CreatorsService', () => {
       } as any),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('filters creators by state with trimming and case-insensitivity', async () => {
+    prisma.creator.findMany = jest.fn().mockResolvedValue([]);
+
+    await service.findAll({ state: ' Lagos ' });
+
+    expect(prisma.creator.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: expect.arrayContaining([
+            { state: { equals: 'Lagos', mode: 'insensitive' } },
+          ]),
+        },
+      }),
+    );
+  });
 });

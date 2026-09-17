@@ -27,7 +27,7 @@ export function withProfilePhoto<T extends { profileImage?: string | null }>(
 export function serializeCreator(creator: CreatorWithRelations) {
   return withProfilePhoto({
     ...creator,
-    primaryNiche: creator.primaryCategory.name,
+    primaryNiche: creator.primaryCategory?.name ?? null,
     secondaryNiches: creator.secondaryCategories.map(
       ({ category }) => category.name,
     ),

@@ -15,6 +15,11 @@ export class QueryCreatorsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  state?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   platform?: string;
 
   @ApiPropertyOptional()

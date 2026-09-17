@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PlatformType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
   creatorRelationsInclude,
@@ -23,6 +23,11 @@ export class CreatorsService {
   }
 
   async findAll(query: QueryCreatorsDto) {
+    const platformFilter = this.resolvePlatformFilter(query.platform);
+    if (query.platform && !platformFilter) {
+      return [];
+    }
+
     const where: Prisma.CreatorWhereInput = {
       AND: [
         query.niche
@@ -55,11 +60,14 @@ export class CreatorsService {
         query.country
           ? { country: { contains: query.country, mode: 'insensitive' } }
           : {},
-        query.platform
+        query.state
+          ? { state: { equals: query.state.trim(), mode: 'insensitive' } }
+          : {},
+        platformFilter
           ? {
               platforms: {
                 some: {
-                  platform: query.platform as never,
+                  platform: platformFilter,
                 },
               },
             }
@@ -79,6 +87,23 @@ export class CreatorsService {
     });
 
     return creators.map(serializeCreator);
+  }
+
+  private resolvePlatformFilter(platform?: string) {
+    if (!platform?.trim()) {
+      return undefined;
+    }
+
+    const formatted = platform.trim().toUpperCase();
+    if (formatted in PlatformType) {
+      return PlatformType[formatted as keyof typeof PlatformType];
+    }
+
+    if (formatted === 'TWITTER') {
+      return PlatformType.X;
+    }
+
+    return null;
   }
 
   async findOne(id: string) {

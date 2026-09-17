@@ -7,9 +7,12 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import {
+  FlutterwaveCardTokenDetails,
   FlutterwaveInitializeResponse,
   FlutterwavePaymentPlanResponse,
   FlutterwaveSubscriptionResponse,
+  FlutterwaveTokenizedChargePayload,
+  FlutterwaveTokenizedChargeResponse,
   FlutterwaveVerificationResponse,
 } from '../interfaces/flutterwave.interface';
 
@@ -138,9 +141,42 @@ export class PaymentsService {
         id: data?.id,
         amount: data?.amount,
         currency: data?.currency,
+        card: data?.card as FlutterwaveCardTokenDetails | undefined,
+        customer: data?.customer,
       };
     } catch (error) {
       throw new BadGatewayException('Unable to verify Flutterwave transaction');
+    }
+  }
+
+  async chargeToken(
+    payload: FlutterwaveTokenizedChargePayload,
+  ): Promise<FlutterwaveTokenizedChargeResponse> {
+    const { secretKey, baseUrl } = this.getSecretKeyAndBaseUrl();
+
+    try {
+      const response = await axios.post(
+        `${baseUrl}/tokenized-charges`,
+        {
+          token: payload.token,
+          currency: payload.currency || 'NGN',
+          amount: payload.amount,
+          email: payload.email,
+          tx_ref: payload.tx_ref,
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          customizations: payload.customizations,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      throw new BadGatewayException('Unable to process tokenized card charge');
     }
   }
 

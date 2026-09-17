@@ -28,9 +28,10 @@ export class RankingService {
     let score = 0;
 
     if (
+      creator.primaryCategory &&
       filters.niches.some(
         (niche) =>
-          niche.toLowerCase() === creator.primaryCategory.name.toLowerCase(),
+          niche.toLowerCase() === creator.primaryCategory!.name.toLowerCase(),
       )
     ) {
       score += 50;

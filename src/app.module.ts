@@ -19,6 +19,8 @@ import { SearchModule } from './search/search.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { UsersModule } from './users/users.module';
 
+import { CreatorSuggestionsModule } from './creator-suggestions/creator-suggestions.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -43,6 +45,7 @@ import { UsersModule } from './users/users.module';
     CampaignIntentsModule,
     CrawlerModule,
     CreatorsModule,
+    CreatorSuggestionsModule,
     SearchModule,
     CampaignsModule,
     SavedCreatorsModule,

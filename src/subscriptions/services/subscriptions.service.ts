@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { PaymentMethodService } from '../../payments/services/payment-method.service';
 import { PaymentsService } from '../../payments/services/payments.service';
 import { UsersService } from '../../users/services/users.service';
 import { InitializeSubscriptionDto } from '../dto/initialize-subscription.dto';
@@ -13,8 +14,8 @@ import { VerifySubscriptionDto } from '../dto/verify-subscription.dto';
 
 const PLAN_CONFIG: Record<SubscriptionPlan, { amount: number; durationDays: number }> =
   {
-    INDIVIDUAL: { amount: 7500, durationDays: 30 },
-    TEAM: { amount: 25000, durationDays: 30 },
+    INDIVIDUAL: { amount: 2000, durationDays: 30 },
+    TEAM: { amount: 2000, durationDays: 30 },
   };
 
 const PLAN_DISPLAY_NAME: Record<SubscriptionPlan, string> = {
@@ -27,6 +28,7 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentsService: PaymentsService,
+    private readonly paymentMethodService: PaymentMethodService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -43,9 +45,10 @@ export class SubscriptionsService {
       throw new NotFoundException('User not found');
     }
 
+    const planConfig = PLAN_CONFIG[dto.plan] ?? { amount: 2000, durationDays: 30 };
     const paymentPlanId = await this.paymentsService.ensureMonthlyPaymentPlan({
-      amount: PLAN_CONFIG[dto.plan].amount,
-      name: PLAN_DISPLAY_NAME[dto.plan],
+      amount: planConfig.amount,
+      name: PLAN_DISPLAY_NAME[dto.plan] ?? 'Caskayd Monthly Subscription',
     });
     const reference = `caskayd-${userId}-${Date.now()}`;
     const subscription = await this.prisma.subscription.create({
@@ -60,7 +63,7 @@ export class SubscriptionsService {
     });
 
     const payment = await this.paymentsService.initializePayment({
-      amount: PLAN_CONFIG[dto.plan].amount,
+      amount: planConfig.amount,
       email: user.email,
       fullName: user.fullName,
       reference,
@@ -89,6 +92,10 @@ export class SubscriptionsService {
       throw new BadRequestException('Payment verification failed');
     }
 
+    if (verification.currency && verification.currency !== 'NGN') {
+      throw new BadRequestException('Invalid transaction currency, expected NGN');
+    }
+
     const subscription = await this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -101,16 +108,23 @@ export class SubscriptionsService {
       throw new NotFoundException('Subscription record not found');
     }
 
-    const remoteSubscription = await this.paymentsService.findSubscription({
-      transactionId: verification.id ?? dto.transactionId,
-      email: user.email,
-      planId: subscription.flutterwavePaymentPlanId ?? undefined,
-    });
-
-    if (!remoteSubscription?.id) {
-      throw new BadRequestException(
-        'Recurring subscription was not created on Flutterwave',
+    let savedPaymentMethod: any = null;
+    if (verification.card && verification.card.token) {
+      savedPaymentMethod = await this.paymentMethodService.saveCardToken(
+        userId,
+        verification.card,
       );
+    }
+
+    let remoteSubscription: any = null;
+    try {
+      remoteSubscription = await this.paymentsService.findSubscription({
+        transactionId: verification.id ?? dto.transactionId,
+        email: user.email,
+        planId: subscription.flutterwavePaymentPlanId ?? undefined,
+      });
+    } catch (e) {
+      // Remote subscription search fallback
     }
 
     const currentlyActiveSubscriptions = await this.prisma.subscription.findMany({
@@ -123,9 +137,13 @@ export class SubscriptionsService {
 
     for (const activeSubscription of currentlyActiveSubscriptions) {
       if (activeSubscription.autoRenew && activeSubscription.flutterwaveSubscriptionId) {
-        await this.paymentsService.cancelSubscription(
-          activeSubscription.flutterwaveSubscriptionId,
-        );
+        try {
+          await this.paymentsService.cancelSubscription(
+            activeSubscription.flutterwaveSubscriptionId,
+          );
+        } catch (e) {
+          // Ignore cancellation errors for obsolete subs
+        }
       }
     }
 
@@ -147,9 +165,10 @@ export class SubscriptionsService {
         autoRenew: true,
         cancelledAt: null,
         flutterwaveTransactionId: String(dto.transactionId),
-        flutterwaveSubscriptionId: remoteSubscription.id,
+        flutterwaveSubscriptionId: remoteSubscription?.id ?? null,
         flutterwavePaymentPlanId:
-          remoteSubscription.plan ?? subscription.flutterwavePaymentPlanId,
+          remoteSubscription?.plan ?? subscription.flutterwavePaymentPlanId,
+        paymentMethodId: savedPaymentMethod?.id ?? subscription.paymentMethodId,
         expiresAt: this.calculateNextExpiry(new Date(), subscription.plan),
       },
     });
@@ -424,4 +443,109 @@ export class SubscriptionsService {
 
     return undefined;
   }
+
+  async renewSubscriptionWithToken(subscriptionId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        user: true,
+        paymentMethod: true,
+      },
+    });
+
+    if (!subscription || !subscription.user) {
+      throw new NotFoundException('Subscription or user not found');
+    }
+
+    let paymentMethod = subscription.paymentMethod;
+    if (!paymentMethod) {
+      paymentMethod = await this.paymentMethodService.getDefaultPaymentMethod(
+        subscription.userId,
+      );
+    }
+
+    if (!paymentMethod || !paymentMethod.token) {
+      await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: SubscriptionStatus.FAILED,
+          autoRenew: false,
+        },
+      });
+      return { success: false, reason: 'No valid payment method token found' };
+    }
+
+    const txRef = `caskayd-autorenew-${subscription.id}-${Date.now()}`;
+    const amount = PLAN_CONFIG[subscription.plan]?.amount ?? 2000;
+
+    try {
+      const chargeResult = await this.paymentsService.chargeToken({
+        token: paymentMethod.token,
+        currency: 'NGN',
+        amount,
+        email: subscription.user.email,
+        tx_ref: txRef,
+        first_name: subscription.user.fullName?.split(' ')[0] || 'Subscriber',
+        last_name: subscription.user.fullName?.split(' ')[1] || '',
+        customizations: {
+          title: 'Caskayd Subscription Auto-Renewal',
+          description: `Auto-renewal for ${subscription.plan} plan (₦${amount})`,
+        },
+      });
+
+      const isSuccess =
+        chargeResult.status === 'success' ||
+        chargeResult.data?.status === 'successful';
+
+      if (isSuccess) {
+        const nextExpiry = this.calculateNextExpiry(
+          subscription.expiresAt && subscription.expiresAt > new Date()
+            ? subscription.expiresAt
+            : new Date(),
+          subscription.plan,
+        );
+
+        if (chargeResult.data?.card) {
+          await this.paymentMethodService.saveCardToken(
+            subscription.userId,
+            chargeResult.data.card,
+          );
+        }
+
+        const updatedSub = await this.prisma.subscription.update({
+          where: { id: subscriptionId },
+          data: {
+            status: SubscriptionStatus.ACTIVE,
+            autoRenew: true,
+            expiresAt: nextExpiry,
+            flutterwaveTransactionId: chargeResult.data?.id
+              ? String(chargeResult.data.id)
+              : subscription.flutterwaveTransactionId,
+            paymentMethodId: paymentMethod.id,
+          },
+        });
+
+        return { success: true, subscription: updatedSub };
+      } else {
+        await this.prisma.subscription.update({
+          where: { id: subscriptionId },
+          data: {
+            status: SubscriptionStatus.FAILED,
+            autoRenew: false,
+          },
+        });
+        return { success: false, reason: chargeResult.message || 'Charge failed' };
+      }
+    } catch (error) {
+      await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: SubscriptionStatus.FAILED,
+          autoRenew: false,
+        },
+      });
+      return { success: false, reason: (error as Error).message };
+    }
+  }
 }
+
