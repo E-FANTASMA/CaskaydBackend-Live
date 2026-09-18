@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const { spawn } = require('child_process');
 
-const { PrismaClient, PlatformType } = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 
 function parseArgs(argv) {
@@ -99,31 +99,16 @@ async function main() {
   try {
     await prisma.$connect();
 
-    const creators = await prisma.creator.findMany({
-      where: {
-        OR: [{ profileImage: null }, { profileImage: '' }],
-        platforms: {
-          some: {
-            platform: PlatformType.INSTAGRAM,
-          },
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        platforms: {
-          where: {
-            platform: PlatformType.INSTAGRAM,
-          },
-          select: {
-            handle: true,
-          },
-          take: 1,
-        },
-      },
-      take: args.limit,
-      orderBy: { createdAt: 'desc' },
-    });
+    const creators = await prisma.$queryRaw`
+      SELECT c.id::text AS id, c.name, cp.handle
+      FROM "Creator" c
+      JOIN "CreatorPlatform" cp
+        ON cp."creatorId" = c.id::text
+      WHERE cp.platform = 'INSTAGRAM'
+        AND (c."profileImage" IS NULL OR c."profileImage" = '')
+      ORDER BY c."createdAt" DESC
+      LIMIT ${args.limit}
+    `;
 
     console.log(`Found ${creators.length} creator(s) without profile images.`);
 
@@ -131,7 +116,7 @@ async function main() {
     let failed = 0;
 
     for (const [index, creator] of creators.entries()) {
-      const handle = creator.platforms[0]?.handle?.replace(/^@/, '');
+      const handle = creator.handle?.replace(/^@/, '');
 
       if (!handle) {
         failed += 1;
@@ -143,12 +128,11 @@ async function main() {
         console.log(`[${index + 1}/${creators.length}] Fetching @${handle} for ${creator.name}...`);
         const result = await runPythonFetch(handle);
 
-        await prisma.creator.update({
-          where: { id: creator.id },
-          data: {
-            profileImage: result.profile_pic_url,
-          },
-        });
+        await prisma.$executeRaw`
+          UPDATE "Creator"
+          SET "profileImage" = ${result.profile_pic_url}
+          WHERE id = CAST(${creator.id} AS uuid)
+        `;
 
         updated += 1;
         console.log(`Saved profile image for ${creator.name}.`);

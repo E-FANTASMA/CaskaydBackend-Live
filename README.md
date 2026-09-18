@@ -67,8 +67,13 @@ Then prepare Prisma:
 
 ```bash
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 ```
+
+`prisma migrate deploy` is safe to run during deployment: Prisma records applied
+migrations in the database and runs each migration only once. Do not use
+`prisma db push`, `prisma migrate reset`, or `prisma migrate dev` against the
+production database.
 
 Start the API in development mode:
 
@@ -180,5 +185,5 @@ If you are only running the current code and nothing calls the queue or Redis cl
 
 ```bash
 npx prisma generate
-npx prisma db push
+npx prisma migrate deploy
 ```

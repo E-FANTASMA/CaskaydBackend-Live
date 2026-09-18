@@ -14,6 +14,7 @@
     "sync:creator-avatars": "py scripts/sync-creator-instagram-avatars.py",
     "postinstall": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "start": "node dist/src/main.js",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
