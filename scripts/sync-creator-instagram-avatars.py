@@ -1,11 +1,23 @@
 import json
+import os
 import sys
 
 import instaloader
 
 
 def fetch_profile_pic(username, should_download=True):
-    loader = instaloader.Instaloader()
+    loader = instaloader.Instaloader(
+        quiet=True,
+        max_connection_attempts=1,
+    )
+
+    login = os.getenv("INSTALOADER_LOGIN", "").strip()
+    session_file = os.getenv("INSTALOADER_SESSIONFILE", "").strip()
+    if session_file and not os.path.isabs(session_file):
+        session_file = os.path.join(os.getcwd(), session_file)
+
+    if login and session_file and os.path.exists(session_file):
+        loader.load_session_from_file(login, session_file)
 
     print(f"Fetching profile information for @{username}...")
     profile = instaloader.Profile.from_username(loader.context, username)

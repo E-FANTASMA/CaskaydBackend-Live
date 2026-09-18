@@ -10,6 +10,44 @@ const NICHE_SYNONYMS: Record<string, string> = {
 
 const PLATFORMS = ['instagram', 'tiktok', 'youtube', 'x', 'linkedin'];
 const GENDERS = ['male', 'female'];
+const NIGERIAN_STATES = [
+  'abia',
+  'adamawa',
+  'akwa ibom',
+  'anambra',
+  'bauchi',
+  'bayelsa',
+  'benue',
+  'borno',
+  'cross river',
+  'delta',
+  'ebonyi',
+  'edo',
+  'ekiti',
+  'enugu',
+  'gombe',
+  'imo',
+  'jigawa',
+  'kaduna',
+  'kano',
+  'katsina',
+  'kebbi',
+  'kogi',
+  'kwara',
+  'lagos',
+  'nasarawa',
+  'niger',
+  'ogun',
+  'ondo',
+  'osun',
+  'oyo',
+  'plateau',
+  'rivers',
+  'sokoto',
+  'taraba',
+  'yobe',
+  'zamfara',
+];
 
 @Injectable()
 export class DictionaryParser {
@@ -19,10 +57,10 @@ export class DictionaryParser {
     const niches = normalizedTokens.filter((token) =>
       ['food', 'tech', 'fashion', 'travel', 'beauty', 'fitness'].includes(token),
     );
-    const locations = normalizedTokens.filter((token) =>
-      ['nigeria', 'lagos', 'abuja', 'ghana', 'kenya', 'london', 'usa'].includes(
-        token,
-      ),
+    const locations = normalizedTokens.filter(
+      (token) =>
+        ['nigeria', 'abuja', 'ghana', 'kenya', 'london', 'usa'].includes(token) ||
+        NIGERIAN_STATES.includes(token),
     );
     const gender = normalizedTokens.find((token) => GENDERS.includes(token));
     const platforms = normalizedTokens.filter((token) => PLATFORMS.includes(token));
