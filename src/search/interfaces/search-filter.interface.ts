@@ -7,6 +7,7 @@ export interface NumericRange {
 
 export interface SearchFilters {
   tokens: string[];
+  identityTerms?: string[];
   niches: string[];
   locations: string[];
   gender?: string;
