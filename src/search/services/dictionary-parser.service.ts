@@ -10,33 +10,6 @@ const NICHE_SYNONYMS: Record<string, string> = {
 
 const PLATFORMS = ['instagram', 'tiktok', 'youtube', 'x', 'linkedin'];
 const GENDERS = ['male', 'female'];
-const SEARCH_STOP_WORDS = new Set([
-  'a',
-  'an',
-  'and',
-  'creators',
-  'creator',
-  'find',
-  'from',
-  'based',
-  'for',
-  'give',
-  'influencer',
-  'influencers',
-  'like',
-  'me',
-  'of',
-  'on',
-  'show',
-  'similar',
-  'state',
-  'the',
-  'to',
-  'under',
-  'with',
-  'over',
-  'followers',
-]);
 const NIGERIAN_STATES = [
   'abia',
   'adamawa',
@@ -91,19 +64,9 @@ export class DictionaryParser {
     );
     const gender = normalizedTokens.find((token) => GENDERS.includes(token));
     const platforms = normalizedTokens.filter((token) => PLATFORMS.includes(token));
-    const knownTerms = new Set([
-      ...niches,
-      ...locations,
-      ...(gender ? [gender] : []),
-      ...platforms,
-    ]);
-    const identityTerms = normalizedTokens.filter(
-      (token) => !knownTerms.has(token) && !SEARCH_STOP_WORDS.has(token),
-    );
 
     return {
       tokens: normalizedTokens,
-      identityTerms,
       niches,
       locations,
       gender,

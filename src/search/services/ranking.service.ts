@@ -28,24 +28,6 @@ export class RankingService {
     let score = 0;
 
     if (
-      (filters.identityTerms ?? []).some((term) =>
-        creator.name.toLowerCase().includes(term.toLowerCase()),
-      )
-    ) {
-      score += 100;
-    }
-
-    if (
-      (filters.identityTerms ?? []).some((term) =>
-        creator.platforms.some((platform) =>
-          platform.handle.toLowerCase().includes(term.toLowerCase()),
-        ),
-      )
-    ) {
-      score += 90;
-    }
-
-    if (
       creator.primaryCategory &&
       filters.niches.some(
         (niche) =>
@@ -123,24 +105,6 @@ export class RankingService {
 
   private scoreLegacyCreator(creator: any, filters: SearchFilters) {
     let score = 0;
-
-    if (
-      (filters.identityTerms ?? []).some((term) =>
-        creator.name.toLowerCase().includes(term.toLowerCase()),
-      )
-    ) {
-      score += 100;
-    }
-
-    if (
-      (filters.identityTerms ?? []).some((term) =>
-        creator.platforms.some((platform: any) =>
-          platform.handle.toLowerCase().includes(term.toLowerCase()),
-        ),
-      )
-    ) {
-      score += 90;
-    }
 
     if (
       filters.niches.some(

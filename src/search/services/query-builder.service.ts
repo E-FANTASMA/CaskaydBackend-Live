@@ -7,19 +7,6 @@ export class QueryBuilderService {
   build(filters: SearchFilters): Prisma.CreatorWhereInput {
     const andFilters: Prisma.CreatorWhereInput[] = [];
 
-    for (const term of filters.identityTerms ?? []) {
-      andFilters.push({
-        OR: [
-          { name: { contains: term, mode: 'insensitive' } },
-          {
-            platforms: {
-              some: { handle: { contains: term, mode: 'insensitive' } },
-            },
-          },
-        ],
-      });
-    }
-
     if (filters.niches.length) {
       andFilters.push({
         OR: [
@@ -140,19 +127,6 @@ export class QueryBuilderService {
 
   buildLegacy(filters: SearchFilters): Prisma.CreatorWhereInput {
     const andFilters: Prisma.CreatorWhereInput[] = [];
-
-    for (const term of filters.identityTerms ?? []) {
-      andFilters.push({
-        OR: [
-          { name: { contains: term, mode: 'insensitive' } },
-          {
-            platforms: {
-              some: { handle: { contains: term, mode: 'insensitive' } },
-            },
-          },
-        ],
-      });
-    }
 
     if (filters.niches.length) {
       andFilters.push({

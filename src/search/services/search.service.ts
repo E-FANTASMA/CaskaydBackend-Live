@@ -33,21 +33,8 @@ export class SearchService {
       query,
       tokens,
     });
-    const campaignTerms = new Set(
-      [
-        campaignIntent?.name,
-        campaignIntent?.slug,
-        ...(campaignIntent?.categoryNames ?? []),
-        ...(campaignIntent?.tags ?? []),
-      ]
-        .filter(Boolean)
-        .flatMap((value) => value!.toLowerCase().split(/[^a-z0-9]+/)),
-    );
     const filters = {
       ...parsedFilters,
-      identityTerms: (parsedFilters.identityTerms ?? []).filter(
-        (term) => !campaignTerms.has(term),
-      ),
       followers,
       campaignIntent,
     };
