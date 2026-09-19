@@ -223,6 +223,50 @@ describe('SubscriptionsService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('activates an initial subscription from a successful charge webhook', async () => {
+    paymentsService.verifyWebhookSignature.mockReturnValue(true);
+    paymentsService.findSubscription.mockResolvedValue(null);
+    prisma.subscription.findFirst.mockResolvedValue({
+      id: 'sub-1',
+      userId: 'user-1',
+      plan: SubscriptionPlan.INDIVIDUAL,
+      status: SubscriptionStatus.PENDING,
+      expiresAt: null,
+      paymentMethodId: null,
+      flutterwavePaymentPlanId: 901,
+      flutterwaveSubscriptionId: null,
+    } as never);
+    prisma.subscription.update.mockResolvedValue({
+      id: 'sub-1',
+      status: SubscriptionStatus.ACTIVE,
+    } as never);
+
+    await service.handleWebhook(
+      'valid-signature',
+      Buffer.from('{}'),
+      {
+        type: 'charge.completed',
+        data: {
+          id: 100,
+          status: 'successful',
+          tx_ref: 'caskayd-user-1-1',
+          payment_plan: 901,
+        },
+      },
+    );
+
+    expect(prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'sub-1' },
+        data: expect.objectContaining({
+          status: SubscriptionStatus.ACTIVE,
+          autoRenew: true,
+          flutterwaveTransactionId: '100',
+        }),
+      }),
+    );
+  });
+
   it('throws when cancelling with no active subscription', async () => {
     prisma.subscription.findMany.mockResolvedValue([] as never);
 

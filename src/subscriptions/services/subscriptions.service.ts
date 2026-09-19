@@ -8,6 +8,7 @@ import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { PaymentMethodService } from '../../payments/services/payment-method.service';
 import { PaymentsService } from '../../payments/services/payments.service';
+import type { FlutterwaveCardTokenDetails } from '../../payments/interfaces/flutterwave.interface';
 import { UsersService } from '../../users/services/users.service';
 import { InitializeSubscriptionDto } from '../dto/initialize-subscription.dto';
 import { VerifySubscriptionDto } from '../dto/verify-subscription.dto';
@@ -176,6 +177,29 @@ export class SubscriptionsService {
     return updatedSubscription;
   }
 
+  async verifyRedirect(transactionId: string, reference?: string) {
+    const verification = await this.paymentsService.verifyTransaction(transactionId);
+
+    if (verification.status !== 'successful' || !verification.tx_ref) {
+      throw new BadRequestException('Payment verification failed');
+    }
+
+    if (reference && verification.tx_ref !== reference) {
+      throw new BadRequestException('Payment reference mismatch');
+    }
+
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { flutterwaveReference: verification.tx_ref },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription record not found');
+    }
+
+    return this.verify(subscription.userId, { transactionId });
+  }
+
   getCurrentSubscription(userId: string) {
     return this.getMostRelevantSubscription(userId);
   }
@@ -266,14 +290,33 @@ export class SubscriptionsService {
   }
 
   private async syncSuccessfulRecurringCharge(data: Record<string, unknown>) {
-    const remoteSubscription = await this.resolveRemoteSubscription(data);
-    if (!remoteSubscription?.id) {
+    let remoteSubscription: Awaited<ReturnType<typeof this.resolveRemoteSubscription>> = null;
+    try {
+      remoteSubscription = await this.resolveRemoteSubscription(data);
+    } catch (e) {
+      // The transaction reference is sufficient to reconcile the local payment.
+    }
+
+    const localSubscription = remoteSubscription?.id
+      ? await this.findLocalSubscription(remoteSubscription)
+      : await this.findLocalSubscriptionByReference(data);
+    if (!localSubscription) {
       return;
     }
 
-    const localSubscription = await this.findLocalSubscription(remoteSubscription);
-    if (!localSubscription) {
-      return;
+    let paymentMethodId = localSubscription.paymentMethodId;
+    const card =
+      typeof data.card === 'object' && data.card !== null
+        ? (data.card as { token?: string })
+        : undefined;
+    if (card?.token) {
+      const paymentMethod = await this.paymentMethodService.saveCardToken(
+        localSubscription.userId,
+        data.card as FlutterwaveCardTokenDetails,
+      );
+      if (paymentMethod) {
+        paymentMethodId = paymentMethod.id;
+      }
     }
 
     await this.prisma.subscription.update({
@@ -284,14 +327,29 @@ export class SubscriptionsService {
         cancelledAt: null,
         flutterwaveTransactionId:
           data.id !== undefined ? String(data.id) : localSubscription.flutterwaveTransactionId,
-        flutterwaveSubscriptionId: remoteSubscription.id,
+        flutterwaveSubscriptionId:
+          remoteSubscription?.id ?? localSubscription.flutterwaveSubscriptionId,
         flutterwavePaymentPlanId:
-          remoteSubscription.plan ?? localSubscription.flutterwavePaymentPlanId,
+          remoteSubscription?.plan ??
+          this.toOptionalNumber(data.payment_plan ?? data.plan) ??
+          localSubscription.flutterwavePaymentPlanId,
+        paymentMethodId,
         expiresAt: this.calculateNextExpiry(
           localSubscription.expiresAt ?? new Date(),
           localSubscription.plan,
         ),
       },
+    });
+  }
+
+  private async findLocalSubscriptionByReference(data: Record<string, unknown>) {
+    if (typeof data.tx_ref !== 'string' || !data.tx_ref) {
+      return null;
+    }
+
+    return this.prisma.subscription.findFirst({
+      where: { flutterwaveReference: data.tx_ref },
+      orderBy: { createdAt: 'desc' },
     });
   }
 

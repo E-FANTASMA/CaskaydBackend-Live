@@ -4,11 +4,16 @@ import {
   Get,
   Headers,
   HttpCode,
+  InternalServerErrorException,
   Post,
   Req,
+  Res,
+  Query,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
@@ -20,7 +25,10 @@ import { SubscriptionsService } from '../services/subscriptions.service';
 @ApiBearerAuth()
 @Controller('subscriptions')
 export class SubscriptionsController {
-  constructor(private readonly subscriptionsService: SubscriptionsService) {}
+  constructor(
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List subscription plans' })
@@ -47,6 +55,33 @@ export class SubscriptionsController {
     @Body() dto: VerifySubscriptionDto,
   ) {
     return this.subscriptionsService.verify(user.sub, dto);
+  }
+
+  @Get('callback')
+  @ApiOperation({ summary: 'Verify Flutterwave payment and redirect to dashboard' })
+  async callback(
+    @Query('transaction_id') transactionId: string | undefined,
+    @Query('tx_ref') reference: string | undefined,
+    @Res() response: Response,
+  ) {
+    const dashboardUrl = this.configService.get<string>('FRONTEND_DASHBOARD_URL');
+    if (!dashboardUrl) {
+      throw new InternalServerErrorException('Frontend dashboard URL is not configured');
+    }
+
+    const redirectUrl = new URL(dashboardUrl);
+    try {
+      if (!transactionId) {
+        throw new Error('Missing Flutterwave transaction id');
+      }
+
+      await this.subscriptionsService.verifyRedirect(transactionId, reference);
+      redirectUrl.searchParams.set('payment', 'success');
+    } catch (error) {
+      redirectUrl.searchParams.set('payment', 'failed');
+    }
+
+    return response.redirect(redirectUrl.toString());
   }
 
   @Post('cancel')
