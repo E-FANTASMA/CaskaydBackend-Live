@@ -264,3 +264,13 @@ model CreatorSuggestion {
   @@index([username])
 }
 
+
+model CrawledSeed {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  platform  String   @default("INSTAGRAM")
+  isSeed    Boolean  @default(true)
+  crawledAt DateTime @default(now())
+
+  @@index([username])
+}
