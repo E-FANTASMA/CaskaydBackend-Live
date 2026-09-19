@@ -11,7 +11,7 @@
     "import:creators": "node scripts/import-creators.js",
     "import:creators:json": "node scripts/import-creators-json.js",
     "sync:creator-avatars:batch": "node scripts/batch-sync-creator-instagram-avatars.js",
-    "sync:creator-avatars": "py scripts/sync-creator-instagram-avatars.py",
+    "sync:creator-avatars": "node scripts/sync-creator-instagram-avatars.js",
     "postinstall": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:migrate:deploy": "prisma migrate deploy",
