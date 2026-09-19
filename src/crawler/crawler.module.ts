@@ -1,3 +1,4 @@
+import { CreatorMetricsSyncSchedulerService } from './services/creator-metrics-sync-scheduler.service';
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CommonModule } from '../common/common.module';
@@ -54,6 +55,7 @@ const crawlerWorkers = [
     CrawlerSchedulerService,
     CrawlerQueueProcessorService,
     CrawlerImporterService,
+    CreatorMetricsSyncSchedulerService,
   ],
   exports: [CrawlerImporterService, CrawlerPipelineService, CrawlerQueueService],
 })

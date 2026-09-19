@@ -1,20 +1,60 @@
-import { Injectable } from '@nestjs/common';
-import { PlatformType, Prisma } from '@prisma/client';
-import { SearchFilters } from '../interfaces/search-filter.interface';
+import { Injectable } from "@nestjs/common";
+import { PlatformType, Prisma } from "@prisma/client";
+import { SearchFilters } from "../interfaces/search-filter.interface";
 
 @Injectable()
 export class QueryBuilderService {
   build(filters: SearchFilters): Prisma.CreatorWhereInput {
     const andFilters: Prisma.CreatorWhereInput[] = [];
 
-    if (filters.niches.length) {
+    if (filters.tokens.length) {
+      andFilters.push({
+        OR: [
+          ...filters.tokens.map((token) => ({
+            name: { contains: token, mode: Prisma.QueryMode.insensitive },
+          })),
+          ...filters.tokens.map((token) => ({
+            platforms: {
+              some: {
+                handle: { contains: token, mode: Prisma.QueryMode.insensitive },
+              },
+            },
+          })),
+          ...(filters.niches.length
+            ? [
+                {
+                  primaryCategory: {
+                    name: { in: filters.niches, mode: Prisma.QueryMode.insensitive },
+                  },
+                },
+                {
+                  secondaryCategories: {
+                    some: {
+                      category: {
+                        name: { in: filters.niches, mode: Prisma.QueryMode.insensitive },
+                      },
+                    },
+                  },
+                },
+                {
+                  searchTags: {
+                    some: {
+                      tag: { in: filters.niches, mode: Prisma.QueryMode.insensitive },
+                    },
+                  },
+                },
+              ]
+            : []),
+        ],
+      });
+    } else if (filters.niches.length) {
       andFilters.push({
         OR: [
           {
             primaryCategory: {
               name: {
                 in: filters.niches,
-                mode: 'insensitive',
+                mode: "insensitive",
               },
             },
           },
@@ -24,7 +64,7 @@ export class QueryBuilderService {
                 category: {
                   name: {
                     in: filters.niches,
-                    mode: 'insensitive',
+                    mode: "insensitive",
                   },
                 },
               },
@@ -33,7 +73,7 @@ export class QueryBuilderService {
           {
             searchTags: {
               some: {
-                tag: { in: filters.niches, mode: 'insensitive' },
+                tag: { in: filters.niches, mode: "insensitive" },
               },
             },
           },
@@ -86,15 +126,15 @@ export class QueryBuilderService {
     if (filters.locations.length) {
       andFilters.push({
         OR: [
-          { country: { in: filters.locations, mode: 'insensitive' } },
-          { state: { in: filters.locations, mode: 'insensitive' } },
+          { country: { in: filters.locations, mode: "insensitive" } },
+          { state: { in: filters.locations, mode: "insensitive" } },
         ],
       });
     }
 
     if (filters.gender) {
       andFilters.push({
-        gender: { equals: filters.gender, mode: 'insensitive' },
+        gender: { equals: filters.gender, mode: "insensitive" },
       });
     }
 
@@ -128,13 +168,50 @@ export class QueryBuilderService {
   buildLegacy(filters: SearchFilters): Prisma.CreatorWhereInput {
     const andFilters: Prisma.CreatorWhereInput[] = [];
 
-    if (filters.niches.length) {
+    if (filters.tokens.length) {
+      andFilters.push({
+        OR: [
+          ...filters.tokens.map((token) => ({
+            name: { contains: token, mode: Prisma.QueryMode.insensitive },
+          })),
+          ...filters.tokens.map((token) => ({
+            platforms: {
+              some: {
+                handle: { contains: token, mode: Prisma.QueryMode.insensitive },
+              },
+            },
+          })),
+          ...(filters.niches.length
+            ? [
+                {
+                  primaryNiche: {
+                    in: filters.niches,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  secondaryNiches: {
+                    hasSome: filters.niches,
+                  },
+                },
+                {
+                  searchTags: {
+                    some: {
+                      tag: { in: filters.niches, mode: "insensitive" },
+                    },
+                  },
+                },
+              ]
+            : []),
+        ],
+      } as Prisma.CreatorWhereInput);
+    } else if (filters.niches.length) {
       andFilters.push({
         OR: [
           {
             primaryNiche: {
               in: filters.niches,
-              mode: 'insensitive',
+              mode: "insensitive",
             },
           },
           {
@@ -145,7 +222,7 @@ export class QueryBuilderService {
           {
             searchTags: {
               some: {
-                tag: { in: filters.niches, mode: 'insensitive' },
+                tag: { in: filters.niches, mode: "insensitive" },
               },
             },
           },
@@ -156,15 +233,15 @@ export class QueryBuilderService {
     if (filters.locations.length) {
       andFilters.push({
         OR: [
-          { country: { in: filters.locations, mode: 'insensitive' } },
-          { state: { in: filters.locations, mode: 'insensitive' } },
+          { country: { in: filters.locations, mode: "insensitive" } },
+          { state: { in: filters.locations, mode: "insensitive" } },
         ],
       });
     }
 
     if (filters.gender) {
       andFilters.push({
-        gender: { equals: filters.gender, mode: 'insensitive' },
+        gender: { equals: filters.gender, mode: "insensitive" },
       });
     }
 

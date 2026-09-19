@@ -1,3 +1,4 @@
+import { CreatorAvatarSyncService } from './creator-avatar-sync.service';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlatformType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
@@ -11,12 +12,20 @@ import { UpdateCreatorDto } from '../dto/update-creator.dto';
 
 @Injectable()
 export class CreatorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly avatarSyncService: CreatorAvatarSyncService,
+  ) {}
 
   async create(dto: CreateCreatorDto) {
     const creator = await this.prisma.creator.create({
       data: await this.buildCreatorCreateInput(dto),
       include: creatorRelationsInclude,
+    });
+
+    // Fire on-the-spin real-time avatar retrieval asynchronously (non-blocking)
+    this.avatarSyncService.syncCreatorAvatar(creator.id).catch((err) => {
+      console.warn('Background avatar sync error:', err);
     });
 
     return serializeCreator(creator);
