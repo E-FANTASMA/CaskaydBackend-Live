@@ -16,11 +16,15 @@ import { CreateCreatorDto } from '../dto/create-creator.dto';
 import { QueryCreatorsDto } from '../dto/query-creators.dto';
 import { UpdateCreatorDto } from '../dto/update-creator.dto';
 import { CreatorsService } from '../services/creators.service';
+import { CreatorAvatarSyncService } from '../services/creator-avatar-sync.service';
 
 @ApiTags('Creators')
 @Controller('creators')
 export class CreatorsController {
-  constructor(private readonly creatorsService: CreatorsService) {}
+  constructor(
+    private readonly creatorsService: CreatorsService,
+    private readonly avatarSyncService: CreatorAvatarSyncService,
+  ) {}
 
   @Get()
   @ApiBearerAuth()
@@ -42,6 +46,12 @@ export class CreatorsController {
   @ApiOperation({ summary: 'Create a creator' })
   create(@Body() dto: CreateCreatorDto) {
     return this.creatorsService.create(dto);
+  }
+
+  @Post(':id/sync-avatar')
+  @ApiOperation({ summary: 'Trigger on-demand HD avatar sync for a creator' })
+  syncAvatar(@Param('id') id: string) {
+    return this.avatarSyncService.syncCreatorAvatar(id, true);
   }
 
   @Patch(':id')

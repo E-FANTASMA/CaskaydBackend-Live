@@ -150,6 +150,18 @@ Default batch size is `5`. To run a different size:
 npm run sync:creator-avatars:batch -- --limit=10
 ```
 
+To run for **all** creators in the database without profile pictures:
+
+```bash
+npm run sync:creator-avatars:batch -- --all
+```
+
+*(Optional) You can customize the delay between Instagram requests (default is 1000ms) using `--delay=<milliseconds>` to avoid rate limits:*
+
+```bash
+npm run sync:creator-avatars:batch -- --all --delay=1500
+```
+
 This batch script:
 
 - only selects creators whose `profileImage` is empty
@@ -187,3 +199,28 @@ If you are only running the current code and nothing calls the queue or Redis cl
 npx prisma generate
 npx prisma migrate deploy
 ```
+
+---
+
+## Core Services & Automated Workers
+
+### 1. On-the-Spin Real-Time HD Avatar Sync (`CreatorAvatarSyncService`)
+When any creator is registered (`POST /api/creators`), the backend immediately fires an asynchronous background task to fetch their True HD avatar with a multi-tier waterfall:
+- **Tier 1 (Instagram True HD)**: Scrapes mobile profile metadata to obtain the raw uncompressed `og:image`.
+- **Tier 2 (TikTok 1080x1080 True HD)**: Scrapes uncompressed `avatarLarger` (1080x1080) from public profile JSON.
+- **Tier 3 (Cross-Handle Fallback)**: Checks TikTok for the same handle if only Instagram was provided.
+- Uploads directly to Supabase Storage (`profile-picture/{creatorId}.jpg`) and updates `Creator.profileImage`.
+- **On-Demand Endpoint**: `POST /api/creators/:id/sync-avatar` allows triggering an avatar refresh for any creator manually.
+
+### 2. Follower-Tiered Metrics Sync Scheduler (`CreatorMetricsSyncSchedulerService`)
+Automated NestJS `@Cron` workers to refresh follower counts and verification checkmark badges:
+- **Tier 1 (Mega >500k followers)**: Runs twice a week (Mondays & Thursdays at 2:00 AM).
+- **Tier 2 (Mid 100k–500k followers)**: Runs once a week (Tuesdays at 3:00 AM).
+- **Tier 3 (Micro <100k followers)**: Runs bi-weekly (1st & 15th of each month at 4:00 AM).
+
+### 3. Relevancy-First Search Ranking (`RankingService`)
+Prioritizes exact and substring matches for names and handles at the top of search results:
+- Exact full name match: +1000 points
+- Substring name match: +500 points
+- Exact `@handle` match: +1000 points
+- Substring handle match: +500 points
