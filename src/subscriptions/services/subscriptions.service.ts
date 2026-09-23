@@ -242,7 +242,7 @@ export class SubscriptionsService {
   async ensureActiveSubscription(userId: string) {
     const subscription = await this.getMostRelevantSubscription(userId);
 
-    if (!subscription) {
+    if (!subscription || subscription.flutterwaveReference?.startsWith('free-')) {
       throw new BadRequestException('An active subscription is required');
     }
 
