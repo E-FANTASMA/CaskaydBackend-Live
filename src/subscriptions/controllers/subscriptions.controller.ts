@@ -34,6 +34,10 @@ export class SubscriptionsController {
   @ApiOperation({ summary: 'List subscription plans' })
   @UseGuards(JwtAuthGuard)
   getPlans() {
+    if (this.configService.get<boolean>('PAYMENT_ENABLED') === false) {
+      return [];
+    }
+
     return this.subscriptionsService.getPlans();
   }
 
