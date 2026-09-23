@@ -11,11 +11,7 @@ async function bootstrap() {
   });
   app.use(helmet());
   app.enableCors({
-    origin: [
-    'https://caskayd.com',
-    'https://www.caskayd.com',
-    'http://localhost:5173', // dev
-  ],
+    origin: true,
     credentials: true,
   });
   app.setGlobalPrefix('api');

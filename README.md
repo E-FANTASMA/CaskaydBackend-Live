@@ -42,6 +42,7 @@ JWT_REFRESH_EXPIRES_IN=30d
 FLUTTERWAVE_SECRET_KEY=
 FLUTTERWAVE_BASE_URL=https://api.flutterwave.com/v3
 FLUTTERWAVE_REDIRECT_URL=
+PAYMENT_ENABLED=true
 KEEP_ALIVE_ENABLED=false
 KEEP_ALIVE_URL=
 REDIS_HOST=127.0.0.1
@@ -62,6 +63,8 @@ Optional keep-alive values:
 - `KEEP_ALIVE_URL=https://your-backend-host/api/health` sets the public health URL to ping
 
 If `KEEP_ALIVE_URL` is empty and your host exposes `RENDER_EXTERNAL_URL`, the app will fall back to `RENDER_EXTERNAL_URL/api/health`.
+
+Set `PAYMENT_ENABLED=false` to allow authenticated users to use subscription-protected features without an active subscription. Payment remains enabled by default.
 
 Then prepare Prisma:
 

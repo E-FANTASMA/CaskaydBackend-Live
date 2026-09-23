@@ -16,6 +16,7 @@ export const configValidationSchema = Joi.object({
     .default('https://api.flutterwave.com/v3'),
   FLUTTERWAVE_REDIRECT_URL: Joi.string().uri().allow('').default(''),
   FLUTTERWAVE_WEBHOOK_SECRET_HASH: Joi.string().allow('').default(''),
+  PAYMENT_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
   FRONTEND_DASHBOARD_URL: Joi.string().uri().allow('').default(''),
   CRAWLER_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
   KEEP_ALIVE_ENABLED: Joi.boolean()
