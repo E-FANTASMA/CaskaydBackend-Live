@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
   InternalServerErrorException,
+  Param,
   Post,
   Req,
   Res,
@@ -17,6 +19,7 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/interfaces/authenticated-user.interface';
+import { AddTeamMemberDto } from '../dto/add-team-member.dto';
 import { InitializeSubscriptionDto } from '../dto/initialize-subscription.dto';
 import { VerifySubscriptionDto } from '../dto/verify-subscription.dto';
 import { SubscriptionsService } from '../services/subscriptions.service';
@@ -100,6 +103,47 @@ export class SubscriptionsController {
   @UseGuards(JwtAuthGuard)
   getMySubscription(@CurrentUser() user: AuthenticatedUser) {
     return this.subscriptionsService.getCurrentSubscription(user.sub);
+  }
+
+  @Get('search-usage')
+  @ApiOperation({ summary: 'Get current subscription search usage' })
+  @UseGuards(JwtAuthGuard)
+  getSearchUsage(@CurrentUser() user: AuthenticatedUser) {
+    return this.subscriptionsService.getSearchUsage(user.sub);
+  }
+
+  @Post('search-packs/initialize')
+  @ApiOperation({ summary: 'Initialize payment for 50 additional searches' })
+  @UseGuards(JwtAuthGuard)
+  initializeSearchPack(@CurrentUser() user: AuthenticatedUser) {
+    return this.subscriptionsService.initializeSearchPack(user.sub);
+  }
+
+  @Get('team/members')
+  @ApiOperation({ summary: 'List Group plan members' })
+  @UseGuards(JwtAuthGuard)
+  getTeamMembers(@CurrentUser() user: AuthenticatedUser) {
+    return this.subscriptionsService.getTeamMembers(user.sub);
+  }
+
+  @Post('team/members')
+  @ApiOperation({ summary: 'Add a registered account to a Group plan' })
+  @UseGuards(JwtAuthGuard)
+  addTeamMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddTeamMemberDto,
+  ) {
+    return this.subscriptionsService.addTeamMember(user.sub, dto.email);
+  }
+
+  @Delete('team/members/:memberId')
+  @ApiOperation({ summary: 'Remove an account from a Group plan' })
+  @UseGuards(JwtAuthGuard)
+  removeTeamMember(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.subscriptionsService.removeTeamMember(user.sub, memberId);
   }
 
   @Post('webhook')

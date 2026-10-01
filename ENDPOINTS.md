@@ -10,7 +10,7 @@ Authentication:
 
 Common enums:
 - `PlatformType`: `INSTAGRAM`, `TIKTOK`, `YOUTUBE`, `X`, `LINKEDIN`
-- `SubscriptionPlan`: `INDIVIDUAL`, `TEAM`
+- `SubscriptionPlan`: `FREELANCER`, `INDIVIDUAL`, `TEAM` (`TEAM` is displayed as Group)
 - `CampaignCreatorStatus`: `NOT_CONTACTED`, `CONTACTED`, `RESPONDED`, `ACCEPTED`, `DECLINED`, `AWAITING_CONTENT`, `CONTENT_DELIVERED`
 - `SuggestionStatus`: `PENDING`, `APPROVED`, `REJECTED`
 
@@ -51,12 +51,59 @@ Common enums:
 
 | Method | Endpoint | Auth | Body | Description |
 | --- | --- | --- | --- | --- |
-| `GET` | `/subscriptions` | JWT | none | List available subscription plans. |
-| `POST` | `/subscriptions/initialize` | JWT | `{ plan }` | Initialize a subscription payment. `plan` is `INDIVIDUAL` or `TEAM`. |
-| `POST` | `/subscriptions/verify` | JWT | `{ transactionId }` | Verify Flutterwave payment and activate subscription. |
-| `POST` | `/subscriptions/cancel` | JWT | none | Cancel recurring subscription auto-renewal. |
-| `GET` | `/subscriptions/me` | JWT | none | Get current user's subscription. |
+| `GET` | `/subscriptions` | JWT | none | List plans and prices. Returns an empty list when `PAYMENT_ENABLED=false`. |
+| `POST` | `/subscriptions/initialize` | JWT | `{ "plan": "INDIVIDUAL" }` | Initialize a subscription checkout. Accepted plans: `FREELANCER`, `INDIVIDUAL`, `TEAM`. Returns `{ subscriptionId, paymentLink, reference }`. |
+| `POST` | `/subscriptions/verify` | JWT | `{ "transactionId": "..." }` | Verify a subscription payment or complete a search-pack purchase. A subscription payment activates the plan; a pack payment returns updated search usage. |
+| `GET` | `/subscriptions/callback` | Flutterwave redirect | query: `transaction_id`, optional `tx_ref` | Verify checkout and redirect to `FRONTEND_DASHBOARD_URL` with `payment=success` or `payment=failed`. |
+| `POST` | `/subscriptions/cancel` | JWT | none | Cancel recurring auto-renewal; current access remains until expiry. |
+| `GET` | `/subscriptions/me` | JWT | none | Get the current user's latest subscription record. |
+| `GET` | `/subscriptions/search-usage` | JWT | none | Get plan, usage, extra search credits, remaining searches, and period end. |
+| `POST` | `/subscriptions/search-packs/initialize` | JWT | none | Start checkout for 50 extra searches on Individual. Returns `{ paymentLink, reference }`; after payment, call `/subscriptions/verify`. |
+| `GET` | `/subscriptions/team/members` | JWT, Group owner | none | List registered accounts attached to the current owner's Group plan. |
+| `POST` | `/subscriptions/team/members` | JWT, Group owner | `{ "email": "member@example.com" }` | Add an already registered account to the owner's Group plan. Owner plus at most 9 members. |
+| `DELETE` | `/subscriptions/team/members/:memberId` | JWT, Group owner | none | Remove a member by their user ID. |
 | `POST` | `/subscriptions/webhook` | Public webhook | Flutterwave payload, header `flutterwave-signature` | Handle Flutterwave subscription webhooks. |
+
+Plan terms (all prices are NGN for 30 days):
+
+| `plan` | Price | Searches | Accounts |
+| --- | ---: | --- | ---: |
+| `FREELANCER` | 20,000 | Unlimited | 1 |
+| `INDIVIDUAL` | 7,500 | 50 per subscription period | 1 |
+| `TEAM` | 50,000 | Unlimited | 10 total, including the owner |
+
+`GET /subscriptions` returns each plan with `plan`, `amount`, `durationDays`, `includedSearches`, `accountLimit`, and `searchLimit`. An unlimited search limit is `null`.
+
+Example `GET /subscriptions/search-usage` response:
+
+```json
+{
+	"plan": "INDIVIDUAL",
+	"searchesUsed": 50,
+	"additionalSearches": 0,
+	"searchLimit": 50,
+	"searchesRemaining": 0,
+	"periodEndsAt": "2026-10-31T12:00:00.000Z"
+}
+```
+
+Buying another search pack adds 50 searches to the current Individual period for 7,500 NGN. Search usage and pack credits reset when the subscription renews. Switching plans requires initializing and verifying a new subscription checkout.
+
+Group members must already have an account; the API currently adds them by email and does not send email invitations. They use their own JWT and receive access through the Group owner's active subscription.
+
+## Search
+
+| Method | Endpoint | Auth | Query | Description |
+| --- | --- | --- | --- | --- |
+| `GET` | `/search` | JWT + Active subscription | `query` | Search creators with deterministic parsing and ranking. `query` min length is 2. Individual searches consume quota; Freelancer and Group searches are unlimited. |
+
+When the Individual quota is exhausted, `/search` returns HTTP `402` with the global error envelope. The `error.code` is `SEARCH_LIMIT_REACHED`; the user can wait for renewal, purchase a 50-search pack, or switch plans.
+
+## Database Setup for Subscription Endpoints
+
+The PostgreSQL statements are in [the subscription schema SQL](prisma/migrations/20261001000000_subscription_tiers_and_search_quotas/migration.sql). They only add an enum value, columns, tables, indexes, and foreign keys; there are no `DROP TABLE`, `DELETE FROM`, or `TRUNCATE` statements. The foreign keys specify `ON DELETE CASCADE` for future deletion of related parent records; this script does not delete existing rows. The statements use `IF NOT EXISTS` checks so they can be rerun if execution stops partway through. Review and back up the database before applying the full script in your SQL client. It has not been executed in this chat.
+
+If the SQL is applied manually, the matching Prisma migration is still unrecorded in `_prisma_migrations`. The normal Prisma deployment process (`npx prisma migrate deploy`) can later run the same idempotent script and record it.
 
 ## Creators
 
@@ -107,12 +154,6 @@ Suggestion duplicate rules:
 | `POST` | `/campaign-intents` | Admin + Active subscription | `{ name, description?, categoryIds, tags }` | Create a campaign intent. |
 | `PATCH` | `/campaign-intents/:id` | Admin + Active subscription | partial campaign intent body | Update a campaign intent. |
 | `DELETE` | `/campaign-intents/:id` | Admin + Active subscription | none | Delete a campaign intent. |
-
-## Search
-
-| Method | Endpoint | Auth | Query | Description |
-| --- | --- | --- | --- | --- |
-| `GET` | `/search` | JWT + Active subscription | `query` | Search creators with deterministic parsing and ranking. `query` min length is 2. |
 
 ## Campaigns
 

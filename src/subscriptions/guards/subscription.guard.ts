@@ -22,6 +22,7 @@ export class SubscriptionGuard implements CanActivate {
     }
 
     await this.subscriptionsService.ensureActiveSubscription(request.user.sub);
+    await this.subscriptionsService.consumeSearch(request.user.sub);
     return true;
   }
 }

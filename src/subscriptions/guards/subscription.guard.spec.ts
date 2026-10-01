@@ -27,8 +27,10 @@ describe('SubscriptionGuard', () => {
     const ensureActiveSubscription = jest
       .fn()
       .mockResolvedValue({ id: 'sub-1' });
+    const consumeSearch = jest.fn();
     const subscriptionsService = {
       ensureActiveSubscription,
+      consumeSearch,
     } as unknown as SubscriptionsService;
     const configService = {
       get: jest.fn().mockReturnValue(true),
@@ -37,5 +39,6 @@ describe('SubscriptionGuard', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(ensureActiveSubscription).toHaveBeenCalledWith('user-1');
+    expect(consumeSearch).toHaveBeenCalledWith('user-1');
   });
 });

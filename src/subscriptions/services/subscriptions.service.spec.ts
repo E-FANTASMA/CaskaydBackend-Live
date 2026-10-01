@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  NotFoundException,
+} from '@nestjs/common';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 import { PaymentMethodService } from '../../payments/services/payment-method.service';
 import { PaymentsService } from '../../payments/services/payments.service';
@@ -16,6 +20,20 @@ describe('SubscriptionsService', () => {
       update: jest.Mock;
       updateMany: jest.Mock;
     };
+    teamMembership: {
+      findUnique: jest.Mock;
+      count: jest.Mock;
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findFirst: jest.Mock;
+      delete: jest.Mock;
+    };
+    searchPackPurchase: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      updateMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
   };
   let paymentsService: jest.Mocked<PaymentsService>;
   let paymentMethodService: jest.Mocked<PaymentMethodService>;
@@ -31,8 +49,21 @@ describe('SubscriptionsService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      teamMembership: {
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        delete: jest.fn(),
+      },
+      searchPackPurchase: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      $transaction: jest.fn(),
     };
-
     paymentsService = {
       ensureMonthlyPaymentPlan: jest.fn(),
       initializePayment: jest.fn(),
@@ -62,7 +93,75 @@ describe('SubscriptionsService', () => {
     );
   });
 
-  it('initializes a recurring checkout with 2000 NGN amount', async () => {
+  it('lists the three monthly plans with their prices and limits', () => {
+    expect(service.getPlans()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          plan: 'FREELANCER',
+          amount: 20000,
+          searchLimit: null,
+          accountLimit: 1,
+        }),
+        expect.objectContaining({
+          plan: 'INDIVIDUAL',
+          amount: 7500,
+          searchLimit: 50,
+          accountLimit: 1,
+        }),
+        expect.objectContaining({
+          plan: 'TEAM',
+          amount: 50000,
+          searchLimit: null,
+          accountLimit: 10,
+        }),
+      ]),
+    );
+  });
+
+  it('allows Individual searches through the included and purchased quota', async () => {
+    prisma.teamMembership.findUnique.mockResolvedValue(null);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        plan: SubscriptionPlan.INDIVIDUAL,
+        status: SubscriptionStatus.ACTIVE,
+        searchesUsed: 99,
+        searchCredits: 50,
+        flutterwaveReference: 'paid-ref',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.consumeSearch('user-1');
+
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
+      where: { id: 'sub-1', searchesUsed: { lt: 100 } },
+      data: { searchesUsed: { increment: 1 } },
+    });
+  });
+
+  it('blocks Individual searches after all paid credits are used', async () => {
+    prisma.teamMembership.findUnique.mockResolvedValue(null);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        plan: SubscriptionPlan.INDIVIDUAL,
+        status: SubscriptionStatus.ACTIVE,
+        searchesUsed: 100,
+        searchCredits: 50,
+        flutterwaveReference: 'paid-ref',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(service.consumeSearch('user-1')).rejects.toBeInstanceOf(
+      HttpException,
+    );
+  });
+
+  it('initializes a recurring checkout with 7500 NGN amount', async () => {
     usersService.findById.mockResolvedValue({
       id: 'user-1',
       email: 'user@example.com',
@@ -82,12 +181,12 @@ describe('SubscriptionsService', () => {
     });
 
     expect(paymentsService.ensureMonthlyPaymentPlan).toHaveBeenCalledWith({
-      amount: 2000,
+      amount: 7500,
       name: 'Caskayd Individual Monthly',
     });
     expect(paymentsService.initializePayment).toHaveBeenCalledWith(
       expect.objectContaining({
-        amount: 2000,
+        amount: 7500,
         paymentPlanId: 901,
       }),
     );
@@ -164,7 +263,7 @@ describe('SubscriptionsService', () => {
       data: {
         id: 9999,
         status: 'successful',
-        amount: 2000,
+        amount: 7500,
       },
     });
 
@@ -179,7 +278,7 @@ describe('SubscriptionsService', () => {
     expect(paymentsService.chargeToken).toHaveBeenCalledWith(
       expect.objectContaining({
         token: 'saved-card-token',
-        amount: 2000,
+        amount: 7500,
         currency: 'NGN',
         email: 'user@example.com',
       }),
