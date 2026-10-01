@@ -249,6 +249,23 @@ export class SubscriptionsService {
     return this.verify(subscription.userId, { transactionId });
   }
 
+  async getUserTrialStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { freeSearchesUsed: true },
+    });
+    const freeSearchesUsed = user?.freeSearchesUsed ?? 0;
+    const freeSearchesLimit = 5;
+    const searchesRemaining = Math.max(0, freeSearchesLimit - freeSearchesUsed);
+    return {
+      isTrial: true,
+      freeSearchesUsed,
+      freeSearchesLimit,
+      searchesRemaining,
+      isExhausted: freeSearchesUsed >= freeSearchesLimit,
+    };
+  }
+
   async getCurrentSubscription(userId: string) {
     const membership = await this.prisma.teamMembership.findUnique({
       where: { memberId: userId },
@@ -263,10 +280,41 @@ export class SubscriptionsService {
       teamSubscription.expiresAt !== null &&
       teamSubscription.expiresAt > new Date()
     ) {
-      return teamSubscription;
+      return {
+        ...teamSubscription,
+        isTrial: false,
+      };
     }
 
-    return this.getMostRelevantSubscription(userId);
+    const subscription = await this.getMostRelevantSubscription(userId);
+    if (
+      subscription &&
+      subscription.status === SubscriptionStatus.ACTIVE &&
+      subscription.expiresAt !== null &&
+      subscription.expiresAt > new Date()
+    ) {
+      return {
+        ...subscription,
+        isTrial: false,
+      };
+    }
+
+    const trial = await this.getUserTrialStatus(userId);
+    return {
+      id: `trial-${userId}`,
+      status: !trial.isExhausted
+        ? SubscriptionStatus.ACTIVE
+        : SubscriptionStatus.EXPIRED,
+      plan: null,
+      autoRenew: false,
+      expiresAt: null,
+      searchesUsed: trial.freeSearchesUsed,
+      searchCredits: 0,
+      isTrial: true,
+      freeSearchesUsed: trial.freeSearchesUsed,
+      freeSearchesLimit: trial.freeSearchesLimit,
+      searchesRemaining: trial.searchesRemaining,
+    };
   }
 
   async cancel(userId: string) {
@@ -321,30 +369,96 @@ export class SubscriptionsService {
         ? teamSubscription
         : await this.getMostRelevantSubscription(userId);
 
-    if (!subscription || subscription.flutterwaveReference?.startsWith('free-')) {
-      throw new BadRequestException('An active subscription is required');
+    const isPaidActive =
+      subscription &&
+      !subscription.flutterwaveReference?.startsWith('free-') &&
+      subscription.status === SubscriptionStatus.ACTIVE &&
+      subscription.expiresAt !== null &&
+      subscription.expiresAt > new Date();
+
+    if (isPaidActive) {
+      return {
+        ...subscription,
+        isTrial: false,
+      };
     }
 
-    if (!subscription.expiresAt || subscription.expiresAt < new Date()) {
-      await this.prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { status: SubscriptionStatus.EXPIRED },
-      });
-      throw new BadRequestException('Subscription has expired');
+    if (subscription && (!subscription.expiresAt || subscription.expiresAt < new Date())) {
+      if (subscription.status !== SubscriptionStatus.EXPIRED) {
+        await this.prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { status: SubscriptionStatus.EXPIRED },
+        });
+      }
     }
 
-    return subscription;
+    const trial = await this.getUserTrialStatus(userId);
+    if (trial.isExhausted) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.PAYMENT_REQUIRED,
+          message:
+            'Free trial limit reached (5 searches). Please choose a subscription plan to continue using Caskayd.',
+          code: 'FREE_TRIAL_EXHAUSTED',
+        },
+        HttpStatus.PAYMENT_REQUIRED,
+      );
+    }
+
+    return {
+      id: `trial-${userId}`,
+      plan: null,
+      status: SubscriptionStatus.ACTIVE,
+      isTrial: true,
+      freeSearchesUsed: trial.freeSearchesUsed,
+      freeSearchesLimit: trial.freeSearchesLimit,
+      searchesRemaining: trial.searchesRemaining,
+    };
   }
 
   async consumeSearch(userId: string) {
-    const subscription = await this.ensureActiveSubscription(userId);
-    if (subscription.flutterwaveReference?.startsWith('free-')) {
-      return;
+    const access = await this.ensureActiveSubscription(userId);
+
+    if ((access as any).isTrial) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { freeSearchesUsed: true },
+      });
+      const currentUsed = user?.freeSearchesUsed ?? 0;
+      if (currentUsed >= 5) {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.PAYMENT_REQUIRED,
+            message:
+              'Free trial search limit reached (5/5). Please upgrade to continue searching.',
+            code: 'FREE_TRIAL_EXHAUSTED',
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { freeSearchesUsed: { increment: 1 } },
+      });
+
+      const nextUsed = currentUsed + 1;
+      return {
+        isTrial: true,
+        freeSearchesUsed: nextUsed,
+        freeSearchesLimit: 5,
+        searchesRemaining: Math.max(0, 5 - nextUsed),
+      };
     }
 
-    const includedSearches = PLAN_CONFIG[subscription.plan].includedSearches;
+    const subscription = access as any;
+    if (subscription.flutterwaveReference?.startsWith('free-')) {
+      return { isTrial: false };
+    }
+
+    const includedSearches = PLAN_CONFIG[subscription.plan]?.includedSearches ?? null;
     if (includedSearches === null) {
-      return;
+      return { isTrial: false };
     }
 
     const searchLimit = includedSearches + subscription.searchCredits;
@@ -367,11 +481,31 @@ export class SubscriptionsService {
         HttpStatus.PAYMENT_REQUIRED,
       );
     }
+
+    return {
+      isTrial: false,
+      searchesUsed: subscription.searchesUsed + 1,
+      searchLimit,
+    };
   }
 
   async getSearchUsage(userId: string) {
-    const subscription = await this.ensureActiveSubscription(userId);
-    const includedSearches = PLAN_CONFIG[subscription.plan].includedSearches;
+    const access = await this.ensureActiveSubscription(userId);
+    if ((access as any).isTrial) {
+      const trial = await this.getUserTrialStatus(userId);
+      return {
+        plan: 'TRIAL',
+        searchesUsed: trial.freeSearchesUsed,
+        additionalSearches: 0,
+        searchLimit: trial.freeSearchesLimit,
+        searchesRemaining: trial.searchesRemaining,
+        isTrial: true,
+        periodEndsAt: null,
+      };
+    }
+
+    const subscription = access as any;
+    const includedSearches = PLAN_CONFIG[subscription.plan]?.includedSearches ?? null;
     const limit =
       includedSearches === null
         ? null
@@ -385,10 +519,11 @@ export class SubscriptionsService {
       searchesRemaining:
         limit === null ? null : Math.max(0, limit - subscription.searchesUsed),
       periodEndsAt: subscription.expiresAt,
+      isTrial: false,
     };
   }
 
-  async initializeSearchPack(userId: string) {
+    async initializeSearchPack(userId: string) {
     const subscription = await this.ensureActiveSubscription(userId);
     if (subscription.plan !== SubscriptionPlan.FREELANCER) {
       throw new BadRequestException(

@@ -59,6 +59,7 @@ model User {
   ownedTeamMembers TeamMembership[] @relation("TeamOwner")
   teamMembership   TeamMembership? @relation("TeamMember")
   searchPackPurchases SearchPackPurchase[]
+  freeSearchesUsed    Int                  @default(0)
 }
 
 model PaymentMethod {
