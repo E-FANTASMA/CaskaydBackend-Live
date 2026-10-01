@@ -249,7 +249,23 @@ export class SubscriptionsService {
     return this.verify(subscription.userId, { transactionId });
   }
 
-  getCurrentSubscription(userId: string) {
+  async getCurrentSubscription(userId: string) {
+    const membership = await this.prisma.teamMembership.findUnique({
+      where: { memberId: userId },
+      select: { ownerId: true },
+    });
+    const teamSubscription = membership
+      ? await this.getMostRelevantSubscription(membership.ownerId)
+      : null;
+
+    if (
+      teamSubscription?.plan === SubscriptionPlan.TEAM &&
+      teamSubscription.expiresAt !== null &&
+      teamSubscription.expiresAt > new Date()
+    ) {
+      return teamSubscription;
+    }
+
     return this.getMostRelevantSubscription(userId);
   }
 

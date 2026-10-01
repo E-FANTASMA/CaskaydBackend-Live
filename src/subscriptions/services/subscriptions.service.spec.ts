@@ -161,6 +161,83 @@ describe('SubscriptionsService', () => {
     );
   });
 
+  it('adds a registered account to an active Group plan', async () => {
+    prisma.teamMembership.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'team-sub-1',
+        plan: SubscriptionPlan.TEAM,
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+    usersService.findByEmail.mockResolvedValue({
+      id: 'member-1',
+      email: 'member@example.com',
+      fullName: 'Group Member',
+    } as never);
+    prisma.teamMembership.count.mockResolvedValue(0);
+    prisma.teamMembership.create.mockResolvedValue({
+      id: 'membership-1',
+      ownerId: 'owner-1',
+      memberId: 'member-1',
+    } as never);
+
+    const result = await service.addTeamMember('owner-1', 'member@example.com');
+
+    expect(prisma.teamMembership.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { ownerId: 'owner-1', memberId: 'member-1' },
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: 'membership-1' }));
+  });
+
+  it('gives a Group member access through the owner subscription', async () => {
+    prisma.teamMembership.findUnique.mockResolvedValue({
+      ownerId: 'owner-1',
+    } as never);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'team-sub-1',
+        plan: SubscriptionPlan.TEAM,
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        flutterwaveReference: 'paid-team-ref',
+      },
+    ] as never);
+
+    const result = await service.ensureActiveSubscription('member-1');
+
+    expect(result).toEqual(expect.objectContaining({
+      id: 'team-sub-1',
+      plan: SubscriptionPlan.TEAM,
+    }));
+  });
+
+  it('shows the owner Group plan as the member current subscription', async () => {
+    prisma.teamMembership.findUnique.mockResolvedValue({
+      ownerId: 'owner-1',
+    } as never);
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'team-sub-1',
+        plan: SubscriptionPlan.TEAM,
+        status: SubscriptionStatus.ACTIVE,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    ] as never);
+
+    const result = await service.getCurrentSubscription('member-1');
+
+    expect(result).toEqual(expect.objectContaining({
+      id: 'team-sub-1',
+      plan: SubscriptionPlan.TEAM,
+    }));
+  });
+
   it('initializes a recurring checkout with 7500 NGN amount', async () => {
     usersService.findById.mockResolvedValue({
       id: 'user-1',
