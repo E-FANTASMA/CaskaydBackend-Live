@@ -26,15 +26,15 @@ const PLAN_CONFIG: Record<
   }
 > = {
   FREELANCER: {
-    amount: 20000,
+    amount: 2000,
     durationDays: 30,
-    includedSearches: null,
+    includedSearches: 50,
     accountLimit: 1,
   },
   INDIVIDUAL: {
     amount: 7500,
     durationDays: 30,
-    includedSearches: 50,
+    includedSearches: null,
     accountLimit: 1,
   },
   TEAM: {
@@ -374,9 +374,9 @@ export class SubscriptionsService {
 
   async initializeSearchPack(userId: string) {
     const subscription = await this.ensureActiveSubscription(userId);
-    if (subscription.plan !== SubscriptionPlan.INDIVIDUAL) {
+    if (subscription.plan !== SubscriptionPlan.FREELANCER) {
       throw new BadRequestException(
-        'Search packs are only available with the Individual plan',
+        'Search packs are only available with the Freelancer plan',
       );
     }
 
@@ -395,7 +395,7 @@ export class SubscriptionsService {
     }
 
     const payment = await this.paymentsService.initializePayment({
-      amount: PLAN_CONFIG.INDIVIDUAL.amount,
+      amount: PLAN_CONFIG.FREELANCER.amount,
       email: user.email,
       fullName: user.fullName,
       reference,
@@ -423,10 +423,10 @@ export class SubscriptionsService {
     const subscription = await this.ensureActiveSubscription(userId);
     if (
       subscription.id !== purchase.subscriptionId ||
-      subscription.plan !== SubscriptionPlan.INDIVIDUAL
+      subscription.plan !== SubscriptionPlan.FREELANCER
     ) {
       throw new BadRequestException(
-        'The Individual subscription associated with this search pack is no longer active',
+        'The Freelancer subscription associated with this search pack is no longer active',
       );
     }
 

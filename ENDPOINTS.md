@@ -58,7 +58,7 @@ Common enums:
 | `POST` | `/subscriptions/cancel` | JWT | none | Cancel recurring auto-renewal; current access remains until expiry. |
 | `GET` | `/subscriptions/me` | JWT | none | Get the current user's latest subscription record. |
 | `GET` | `/subscriptions/search-usage` | JWT | none | Get plan, usage, extra search credits, remaining searches, and period end. |
-| `POST` | `/subscriptions/search-packs/initialize` | JWT | none | Start checkout for 50 extra searches on Individual. Returns `{ paymentLink, reference }`; after payment, call `/subscriptions/verify`. |
+| `POST` | `/subscriptions/search-packs/initialize` | JWT | none | Start checkout for 50 extra searches on Freelancer. Returns `{ paymentLink, reference }`; after payment, call `/subscriptions/verify`. |
 | `GET` | `/subscriptions/team/members` | JWT, Group owner | none | List registered accounts attached to the current owner's Group plan. |
 | `POST` | `/subscriptions/team/members` | JWT, Group owner | `{ "email": "member@example.com" }` | Add an already registered account to the owner's Group plan. Owner plus at most 9 members. |
 | `DELETE` | `/subscriptions/team/members/:memberId` | JWT, Group owner | none | Remove a member by their user ID. |
@@ -68,8 +68,8 @@ Plan terms (all prices are NGN for 30 days):
 
 | `plan` | Price | Searches | Accounts |
 | --- | ---: | --- | ---: |
-| `FREELANCER` | 20,000 | Unlimited | 1 |
-| `INDIVIDUAL` | 7,500 | 50 per subscription period | 1 |
+| `FREELANCER` | 2,000 | 50 per subscription period | 1 |
+| `INDIVIDUAL` | 7,500 | Unlimited | 1 |
 | `TEAM` | 50,000 | Unlimited | 10 total, including the owner |
 
 `GET /subscriptions` returns each plan with `plan`, `amount`, `durationDays`, `includedSearches`, `accountLimit`, and `searchLimit`. An unlimited search limit is `null`.
@@ -78,8 +78,8 @@ Example `GET /subscriptions/search-usage` response:
 
 ```json
 {
-	"plan": "INDIVIDUAL",
-	"searchesUsed": 50,
+		"plan": "FREELANCER",
+		"searchesUsed": 50,
 	"additionalSearches": 0,
 	"searchLimit": 50,
 	"searchesRemaining": 0,
@@ -87,7 +87,7 @@ Example `GET /subscriptions/search-usage` response:
 }
 ```
 
-Buying another search pack adds 50 searches to the current Individual period for 7,500 NGN. Search usage and pack credits reset when the subscription renews. Switching plans requires initializing and verifying a new subscription checkout.
+Buying another search pack adds 50 searches to the current Freelancer period for 2,000 NGN. Search usage and pack credits reset when the subscription renews. Switching plans requires initializing and verifying a new subscription checkout.
 
 Group members must already have an account; the API currently adds them by email and does not send email invitations. They use their own JWT and receive access through the Group owner's active subscription.
 
@@ -95,9 +95,9 @@ Group members must already have an account; the API currently adds them by email
 
 | Method | Endpoint | Auth | Query | Description |
 | --- | --- | --- | --- | --- |
-| `GET` | `/search` | JWT + Active subscription | `query` | Search creators with deterministic parsing and ranking. `query` min length is 2. Individual searches consume quota; Freelancer and Group searches are unlimited. |
+| `GET` | `/search` | JWT + Active subscription | `query` | Search creators with deterministic parsing and ranking. `query` min length is 2. Freelancer searches consume quota; Individual and Group searches are unlimited. |
 
-When the Individual quota is exhausted, `/search` returns HTTP `402` with the global error envelope. The `error.code` is `SEARCH_LIMIT_REACHED`; the user can wait for renewal, purchase a 50-search pack, or switch plans.
+When the Freelancer quota is exhausted, `/search` returns HTTP `402` with the global error envelope. The `error.code` is `SEARCH_LIMIT_REACHED`; the user can wait for renewal, purchase a 50-search pack, or switch plans.
 
 ## Database Setup for Subscription Endpoints
 

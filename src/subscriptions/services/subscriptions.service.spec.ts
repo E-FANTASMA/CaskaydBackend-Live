@@ -98,14 +98,14 @@ describe('SubscriptionsService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           plan: 'FREELANCER',
-          amount: 20000,
-          searchLimit: null,
+          amount: 2000,
+          searchLimit: 50,
           accountLimit: 1,
         }),
         expect.objectContaining({
           plan: 'INDIVIDUAL',
           amount: 7500,
-          searchLimit: 50,
+          searchLimit: null,
           accountLimit: 1,
         }),
         expect.objectContaining({
@@ -118,12 +118,12 @@ describe('SubscriptionsService', () => {
     );
   });
 
-  it('allows Individual searches through the included and purchased quota', async () => {
+  it('allows Freelancer searches through the included and purchased quota', async () => {
     prisma.teamMembership.findUnique.mockResolvedValue(null);
     prisma.subscription.findMany.mockResolvedValue([
       {
         id: 'sub-1',
-        plan: SubscriptionPlan.INDIVIDUAL,
+        plan: SubscriptionPlan.FREELANCER,
         status: SubscriptionStatus.ACTIVE,
         searchesUsed: 99,
         searchCredits: 50,
@@ -141,12 +141,12 @@ describe('SubscriptionsService', () => {
     });
   });
 
-  it('blocks Individual searches after all paid credits are used', async () => {
+  it('blocks Freelancer searches after all paid credits are used', async () => {
     prisma.teamMembership.findUnique.mockResolvedValue(null);
     prisma.subscription.findMany.mockResolvedValue([
       {
         id: 'sub-1',
-        plan: SubscriptionPlan.INDIVIDUAL,
+        plan: SubscriptionPlan.FREELANCER,
         status: SubscriptionStatus.ACTIVE,
         searchesUsed: 100,
         searchCredits: 50,
